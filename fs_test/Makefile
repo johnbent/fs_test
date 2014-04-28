@@ -35,10 +35,16 @@ endif
 # -Wall doesn't work with pgi....
 CFLAGS  = -g -I. ${MPI_INC} ${MPI_HOST_32BIT} -DROMIO ${LARGE_FILE}
 
-SRCS_FS_TEST = fs_test.c utilities.c print.c hashtable.c hashtable_itr.c boolean.c
+ifneq (,$(findstring HAS_IOD,$(MPI_INC)))
+	IOD = iod.c
+endif
+
+SRCS_FS_TEST = fs_test.c utilities.c print.c hashtable.c hashtable_itr.c boolean.c ${IOD}
 SRCS_THREADS = nton_plfs_thread_db.c utilities.c hashtable.c hashtable_itr.c boolean.c print.c
 OBJS_FS_TEST=$(SRCS_FS_TEST:.c=.o)
 OBJS_THREADS=$(SRCS_THREADS:.c=.o)
+
+TEST_NODES = ${EFF_MPI_IONS}
 
 # do not build nton_plfs_thread_db if plfs not configured
 ifneq (,$(findstring HAS_PLFS,$(MPI_INC)))
@@ -52,6 +58,9 @@ $(TARGET_FS_TEST):	$(OBJS_FS_TEST)
 
 $(TARGET_THD):	$(OBJS_THREADS) 
 	$(CC) $(CFLAGS) $(OBJS_THREADS) ${MPI_LD} -o $(TARGET_THD_EXE)
+
+test: $(TARGET_FS_EXE)
+	mpirun -np 2 --hosts ${TEST_NODES} ./$(TARGET_FS_EXE) --type 2 --io iod --size 65536 --target ${USER}.%s --strided 1 -nodb -time 3 --op write
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c $? -o $@

@@ -40,7 +40,7 @@ extern "C" {
 
 enum
 IOType {
-     IO_MPI, IO_POSIX, IO_PLFS 
+     IO_MPI, IO_POSIX, IO_PLFS, IO_IOD,
 };
 
 #include <getopt.h>
@@ -52,6 +52,10 @@ IOType {
 
 #ifdef HAS_PLFS
 #include "plfs.h"
+#endif
+
+#ifdef HAS_IOD
+#include "iod_fstest_types.h"
 #endif
 
 #include "hashtable.h"
@@ -166,6 +170,9 @@ struct State {
 */
     Plfs_fd *plfs_fd;
     #endif
+	#ifdef HAS_IOD
+	iod_state_t iod_state;
+	#endif
 };
 
 /* Note that in fs_test.c's "init" function, memset is used to set all
@@ -250,6 +257,7 @@ struct Parameters {
   int    numthreads;
   int    totalthreads;
   int    thread_write;
+
 };
 
 

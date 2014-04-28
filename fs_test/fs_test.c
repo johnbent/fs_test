@@ -67,6 +67,11 @@
 #include "plfs.h"
 #endif
 
+#ifdef HAS_IOD
+#include "iod.h"
+#include "plfs.h"
+#endif
+
 /*
    TODO:
     read should be affected by time limit also
@@ -112,6 +117,10 @@ struct myoption mylongopts[] = {
     { "check",      required_argument,  NULL,                           'C',
         "0 don't fill buffer nor verify, 1 check first byte in each block,\n"
         "\t2 check first byte in each page, 3 check every byte"           },
+#ifdef HAS_IOD
+	{ "iodcksum",    no_argument,        NULL,							 'c',
+		"Whether to use IOD checksumming\n",							  }, 
+#endif
     { "num_nn_dirs", required_argument,  NULL,                           'd',
         "For non-PLFS N-N I/O, number of subdirectories for files"        },
     { "errout",     required_argument,  NULL,                            'e',
@@ -187,7 +196,7 @@ struct myoption mylongopts[] = {
 };
 
 char *prog_name = NULL;
-char is_plfs_target = 0;
+int is_plfs_target = 0;
 
 void 
 print_time(const char *what, struct State *state) {
@@ -271,6 +280,12 @@ fini( struct Parameters *params, struct State *state ) {
     if (params->ofname != NULL && state->my_rank == 0)   fclose(state->ofptr);
     if (params->efname != NULL)   fclose(state->efptr);
 
+	#ifdef HAS_IOD
+    if ( params->io_type == IO_IOD ) {
+		iod_fini(&(state->iod_state));
+	}
+	#endif
+
     if(params->info && params->info != MPI_INFO_NULL){
         MPI_Info_free(&(params->info));
     }
@@ -298,6 +313,11 @@ check_illogical_args( struct Parameters *params, struct State *state,
         }
         Usage( params, state, NULL, NULL );
     }
+}
+
+void
+catch_gdb() {
+	// little no-op to help with gdb breakpoints
 }
 
 /*******************************************
@@ -383,6 +403,12 @@ int parse_command_line(int my_rank, int argc, char *argv[],
         case 'b':
             params->barriers = strdup( optarg );
             break;
+#ifdef HAS_IOD
+		case 'c':
+			printf("Using iod checksums\n");
+			state->iod_state.params.checksum = 1;
+			break;
+#endif
         case 'd':   
             temp_int = atoi( optarg );
             if ( temp_int < 1 ) {
@@ -404,6 +430,7 @@ int parse_command_line(int my_rank, int argc, char *argv[],
             params->tmpdirname = strdup( optarg );
             break;
         case 'g':
+			catch_gdb();
             params->tfname = strdup( optarg );
             // is_plfs_target is initialized to 0 (zero), or false.
             if ( strlen( params->tfname ) >= strlen( "plfs:" )) {
@@ -414,10 +441,11 @@ int parse_command_line(int my_rank, int argc, char *argv[],
               if ( !is_plfs_target ) {
                 struct stat st_temp;
                 char *tfname_dir_part;
+				char *plfsdirname;
 
                 tfname_dir_part = strdup( params->tfname );
-                tfname_dir_part = dirname( tfname_dir_part );
-                is_plfs_target = !plfs_getattr( NULL, tfname_dir_part, &st_temp, 0 );
+                plfsdirname = dirname( tfname_dir_part );
+                is_plfs_target = !plfs_getattr( NULL, plfsdirname, &st_temp, 0 );
                 free( tfname_dir_part );
               }
             #endif
@@ -435,9 +463,16 @@ int parse_command_line(int my_rank, int argc, char *argv[],
                     check_illogical_args( params, state, 1,
                         "Can't do PLFS io unless built with -DHAS_PLFS." );
                 #endif
+            } else if ( !strcmp( optarg, "iod" ) ) {
+                #ifdef HAS_IOD
+                    params->io_type = IO_IOD;
+                #else
+                    check_illogical_args( params, state, 1,
+                        "Can't do IOD io unless built with -DHAS_IOD." );
+                #endif
             } else {
                     check_illogical_args( params, state, 1,
-                    "Unknown io type %s.  Use posix|mpi|plfs.", optarg );
+                    "Unknown io type %s.  Use posix|mpi|plfs|iod.", optarg );
             }
             break;
         case 'h':
@@ -805,7 +840,6 @@ init( int argc, char **argv, struct Parameters *params,
     params->io_type             = IO_MPI;
     params->io_type_str         = "mpi";
 
-
     state->efptr    = stderr;
     state->ofptr    = stdout;
     state->pagesize = getpagesize(); 
@@ -813,10 +847,19 @@ init( int argc, char **argv, struct Parameters *params,
         //fprintf( stderr, "Arg %d: %s\n", i, argv[i] );
     } 
 
+	#ifdef HAS_IOD
+	int multi_thread_provide;
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &multi_thread_provide);
+    if (multi_thread_provide != MPI_THREAD_MULTIPLE) {
+        fprintf( stderr, "ERROR: Unable to initialize MPI (MPI_Init).\n");
+		return -1;
+    }	
+	#else
     if (MPI_Init(&argc, &argv) != MPI_SUCCESS) {
         fprintf(state->efptr, "ERROR: Unable to initialize MPI (MPI_Init).\n");
         return -1;
     }
+	#endif
 
     // tell MPI that we want to handle errors.  This should be good
     // because we always do our own error checking of MPI routines and
@@ -907,7 +950,7 @@ init( int argc, char **argv, struct Parameters *params,
      *
      * First, ensure that we are doing N-N I/O, then that we are not putting
      * all the files in 1 (one) directory, then that the target is not a PLFS
-     * file system, and finally that we are not using the PLFS API to do the I/O.
+     * file system, and finally that we are not using the PLFS or IOD API. 
      */
 
     /*
@@ -916,6 +959,7 @@ init( int argc, char **argv, struct Parameters *params,
     if (( params->test_type == 1 )     &&
         ( params->num_nn_dirs > 1 )    &&
         ( !is_plfs_target )            &&
+        ( params->io_type != IO_IOD  ) &&
         ( params->io_type != IO_PLFS )) {
 
       /*
@@ -933,10 +977,8 @@ init( int argc, char **argv, struct Parameters *params,
       fprintf( stderr, "Before expand_tfname_for_nn, nn_dir_prefix is \"%s\"\n", params->nn_dir_prefix );
       */
       params->tfname = expand_tfname_for_nn( params->tfname, &( params->nn_dir_prefix ), state );
-      /*
       fprintf( stderr, "After expand_tfname_for_nn, tfname is \"%s\"\n", params->tfname );
       fprintf( stderr, "After expand_tfname_for_nn, nn_dir_prefix is \"%s\"\n", params->nn_dir_prefix );
-      */
 
       /*
        * Now if we are rank 0 (zero) and we will be writing, we will let rank
@@ -977,10 +1019,29 @@ init( int argc, char **argv, struct Parameters *params,
       }
 
       free( temp_tfname );
-    }
+    } /* end of check for nn-subdirs */
+
+
+	/* 
+ 	* If we are doing IOD IO, we need to set up a bunch of stuff
+ 	*/
+	if (params->io_type == IO_IOD) {
+		#ifdef HAS_IOD
+		int ret = iod_init(params, state, MPI_COMM_WORLD);
+		if (ret != 0) {
+			printf("iod_initialize failed rc: %d, exit.\n", ret);
+			assert(0);
+		} else {
+			printf("IOD_initialized\n");
+		}
+		#else
+			return -1;
+		#endif
+	}
 
     return 0;
 }
+
 
 void
 check_hints( struct Parameters *params,
@@ -1209,6 +1270,18 @@ open_file(  struct Parameters *params,
       }
 		
       break;
+	case IO_IOD:
+		#ifdef HAS_IOD
+		mpi_ret = iod_open( params, state, target, read_write, comm_file );
+		MPI_Barrier(comm_file);
+		if ( mpi_ret != 0 ) {
+			printf( "Don't know how to do IOD open yet.\n");
+			assert(0);
+		} else {
+			success = 1;
+		}
+		#endif
+		break;
     case IO_PLFS:
       #ifdef HAS_PLFS
       // later can optimize this especially if -collective is passed
@@ -1334,6 +1407,9 @@ read_write_buf( struct Parameters *params,
     #ifdef HAS_PLFS
     plfs_error_t plfs_ret = PLFS_SUCCESS;
     #endif
+	#ifdef HAS_IOD
+	iod_ret_t iodret;
+	#endif
     ssize_t bytes;
     MPI_Status io_stat;
     MPI_Status *status = NULL;
@@ -1420,6 +1496,19 @@ read_write_buf( struct Parameters *params,
             }
             if ( ret == MPI_SUCCESS ) success = 1;
             break;
+		case IO_IOD:
+			#ifdef HAS_IOD
+            if ( read_write == WRITE_MODE ) {
+				ret = iod_write(&(state->iod_state),
+					buffer,params->obj_size, offset, &bytes);
+			} else {
+				ret = iod_read(&(state->iod_state),
+					buffer,params->obj_size, offset, &bytes);
+			}
+			if (ret != 0) { assert(0); ret = -ret; }
+			if (bytes==params->obj_size) success=1;
+			#endif
+			break;
         case IO_PLFS:
             #ifdef HAS_PLFS
             if ( read_write == WRITE_MODE ) {
@@ -1546,6 +1635,9 @@ get_file_size( struct State *state, struct Parameters *params,
     int success = 0;
     struct stat buf;
     int ret;
+	#ifdef HAS_IOD
+	iod_ret_t iod_ret = 0;
+	#endif
     MPI_Offset moff;
     switch( params->io_type ) {
         case IO_POSIX:
@@ -1566,6 +1658,16 @@ get_file_size( struct State *state, struct Parameters *params,
             else errno = -ret;
             #endif
             break;
+		case IO_IOD:
+			#ifdef HAS_IOD
+			iod_ret = iod_getattr( &(state->iod_state), &buf);
+            if ( iod_ret == 0 ) {
+				success = 1;
+			} else {
+				assert(iod_ret != ENOSYS);
+			}
+			#endif
+			break;
         default:
             break;
     }
@@ -1585,6 +1687,10 @@ close_file( struct Parameters *params,
     int mpi_ret;
     int success = 0;
 
+	#ifdef HAS_IOD
+	iod_ret_t iod_ret;
+	#endif
+
         // sync the file
     if(read_write == WRITE_MODE && params->sync_flag) {
         conditional_barrier( state, times, params, "bsync", 1 );
@@ -1600,11 +1706,20 @@ close_file( struct Parameters *params,
                 break;
             case IO_PLFS:
                 #ifdef HAS_PLFS
-//                mpi_ret = plfs_sync( state->plfs_fd, state->my_rank ); 
+                //mpi_ret = plfs_sync( state->plfs_fd, state->my_rank ); 
                 mpi_ret = plfs_sync( state->plfs_fd ); 
                 if ( mpi_ret == 0 ) success = 1;
                 #endif
                 break;
+			case IO_IOD:
+				#ifdef HAS_IOD
+				iod_ret = iod_sync(&(state->iod_state));
+                if ( iod_ret == 0 ) {
+					success = 1;
+				} else {
+					assert(iod_ret != ENOSYS);
+				}
+				#endif
             default:
                 fatal_error( state->efptr, state->my_rank, mpi_ret, NULL, 
                         "%s Unknown io type %s\n", __FUNCTION__, 
@@ -1646,6 +1761,16 @@ close_file( struct Parameters *params,
                 else errno = -mpi_ret;
                 #endif
                 break;
+			case IO_IOD:
+				#ifdef HAS_IOD
+				iod_ret=iod_trunc(&(state->iod_state));
+                if ( iod_ret == 0 ) {
+					success = 1;
+				} else {
+					assert(iod_ret != ENOSYS);
+				}
+				#endif
+				break;
             default:
                 break;
         }
@@ -1710,6 +1835,16 @@ close_file( struct Parameters *params,
             mpi_ret = MPI_File_close( &(state->mpi_fh) );
             if ( mpi_ret == MPI_SUCCESS ) success = 1;
             break;
+		case IO_IOD:
+			#ifdef HAS_IOD
+			iod_ret = iod_close( &(state->iod_state));	
+            if ( iod_ret == 0 ) {
+				success = 1;
+			} else {
+				assert(iod_ret != ENOSYS);
+			}
+			#endif
+			break;
         case IO_PLFS:
             #ifdef HAS_PLFS
             flags = ( read_write == READ_MODE ? 
@@ -1780,6 +1915,16 @@ close_file( struct Parameters *params,
                     else errno = -mpi_ret;
                     #endif
                     break;
+				case IO_IOD:
+					#ifdef HAS_IOD
+					iod_ret = iod_unlink( &(state->iod_state));	
+					if ( iod_ret == 0 ) {
+						success = 1;
+					} else {
+						assert(iod_ret != ENOSYS);
+					}
+					#endif
+					break;
                 default:
                     break;
             }
@@ -1916,9 +2061,6 @@ make_str_copy( char *orig, int length, struct State *state ) {
     strncpy( new_str, orig, length );
     return new_str;
 }
-
-void
-catch_gdb() {}
 
 int
 test_set_char( char correct_char, char *location, int read_write, 
