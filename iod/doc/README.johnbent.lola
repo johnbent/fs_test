@@ -1,0 +1,55 @@
+# Update IOD
+cp -rv iod_0414 iod_${DATE}
+cd iod_${DATE}
+git pull origin master
+git checkout remotes/origin/master
+git checkout tags/${TAG}
+
+# Initial setup
+1. vim ~/.bashrc # set environment variables to build using DAOS
+2. as root, run /scratch/iod/install/yum_installs.sh
+3. install cmake 2.8.12.1
+4. ln -s /usr/lib/libpthread.* /usr/lib/libpthreads.*
+5. git clone http://git.mcs.anl.gov/radix/mchecksum & install it
+	5.1 cmake -DCMAKE_INSTALL_PREFIX:PATH=/scratch/iod -DBUILD_SHARED_LIBS=ON ..
+
+# Install IOD
+-- PLFS
+cd src/dep/
+git clone https://github.com/zhang-jingwang/plfs-core.git plfs -b iod
+- or - git pull origin iod
+cd plfs/src 
+edit CMakeLists.txt to add these two lines:
+	include_directories(/scratch/iod)
+	include_directories(/scratch/iod/include)
+mkdir build & cd build 
+\rm -rf * & cmake -DCMAKE_INCLUDE_PATH:PATH=/scratch/iod/include -DCMAKE_INSTALL_PREFIX:PATH=/scratch/iod .. & make all & make install
+cmake -DCMAKE_INCLUDE_PATH:PATH=/scratch/iod/include -DCMAKE_INSTALL_PREFIX:PATH=/scratch/iod/install/`date +%Y.%m.%e` -DCMAKE_BUILD_TYPE=Debug -DADMIN_TOOLS=Yes ..
+
+-- PBL
+dep/pbl/src/makefile: fix to point to daos appropriately 
+dep/pbl/src: cp libpbl* and executables and *.h files to install
+find . -type f -perm +111 -print # to find executables
+
+-- MDHIM
+dep/mdhim/src: make & cp library and header files
+
+-- IOD
+might need to remove old header files in /scratch/iod/include
+#iod/src: make # copy library and header files 
+cmake -DCMAKE_INSTALL_PREFIX:PATH=/scratch/iod/install/`date +%Y.%m.%e` -DENABLE_CORRUPTION_INJECTION=ON -DPLFS_PROJECT_DIR=/home/john.bent/iod/src/dep/plfs ..
+
+HDF demo: lola-[12-25]
+root password: lustre
+/scratch filesystem
+lola-[18-19] are the IONs which have lustre mounted
+
+# making the burst buffer storage
+[root@lola-18 iod]# mke2fs /dev/sdh
+[root@lola-18 iod]# mkdir /mnt/bb
+[root@lola-18 iod]# mount /dev/sdh /mnt/bb
+[root@lola-18 iod]# chmod 0777 /mnt/bb
+
+
+git pull origin master to update
+Need iod_api.h and iod_types.h and libiod

@@ -1,0 +1,51 @@
+- global_params:
+  num_hostdirs: 16
+  #max_index_length: 2097152
+  threadpool_size: 8
+  index_buffer_mbs: 16
+  global_summary_dir: /tmp
+  mlog_setmasks:
+     DEBUG
+#    INFO
+#    index=DEBUG
+#    container=DEBUG
+#  mlog_file:  /tmp/plfs-%p-%h-%t.log
+  mlog_file:  /tmp/iod.debug.log-%p-%h-%t
+  #mlog_file:  /dev/stdout
+
+- mount_point: /tmp/iod_plfs
+#  workload: shared_file
+  workload: n-1
+#  statfs: posix:///global/visible
+  backends:
+    - location: posix:/mnt/lustre1/.plfs__canonical
+      type: canonical
+    - location: posix:/mnt/lustre1/iod1/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre4/iod14/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre4/iod13/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre4/iod12/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre4/iod11/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre3/iod10/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre3/iod9/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre3/iod8/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre2/iod7/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre2/iod6/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre2/iod5/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre1/iod4/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre1/iod3/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre1/iod2/.plfs__shadow
+      type: shadow
+

@@ -1,0 +1,14 @@
+- global_params:
+  num_hostdirs: 16
+  max_index_length: 2097152
+  threadpool_size: 8
+  index_buffer_mbs: 16
+#  global_summary_dir: /tmp
+  mlog_setmasks:
+     DEBUG
+#    INFO
+#    index=DEBUG
+#    container=DEBUG
+#  mlog_file:  /tmp/plfs-%p-%h-%t.log
+  mlog_file:  /tmp/iod.debug.log-%p-%h-%t
+  #mlog_file:  /dev/stdout

@@ -1,0 +1,8 @@
+iod_checksum_chunk_bytes 2097152
+# central_io_buffering is whether to use DAOS_OBJ_IO_BUFFERED
+central_io_buffering     0
+iod_root                 /tmp/iod_root
+iod_threadpool_size      8
+mount_point              /tmp/iod_plfs
+central_path             /mnt/daos
+iod_shards_per_target	1

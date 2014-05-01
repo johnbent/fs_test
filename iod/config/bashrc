@@ -1,0 +1,53 @@
+# .bashrc
+
+# User specific aliases and functions
+
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+
+module unload openmpi-x86_64
+module unload mpi/openmpi-x86_64
+module load mpich-x86_64
+
+IOD_HOME=/scratch/iod/
+AXE_HOME=/scratch/hdf/install/axe
+LD_LIBRARY_PATH=$AXE_HOME/lib:$LD_LIBRARY_PATH
+
+BMI_HOME=/scratch/hdf/bmi/default
+LD_LIBRARY_PATH=$BMI_HOME/lib:$LD_LIBRARY_PATH
+
+MERCURY_HOME=/scratch/hdf/mercury/default
+LD_LIBRARY_PATH=$MERCURY_HOME/lib:$LD_LIBRARY_PATH
+
+LD_LIBRARY_PATH=/scratch/hdf/install/opa/lib:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=/scratch/hdf/build/H5Part/build/lib:$LD_LIBRARY_PATH
+
+export LD_LIBRARY_PATH=/usr/local/lib64:/usr/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$IOD_HOME/lib:$LD_LIBRARY_PATH
+export C_INCLUDE_PATH=$IOD_HOME/include:$C_INCLUDE_PATH
+export CPP_INCLUDE_PATH=$IOD_HOME/include:$C_INCLUDE_PATH
+export LIBRARY_PATH=$IOD_HOME/lib:$LIBRARY_PATH
+export PATH=$IOD_HOME/bin:$IOD_HOME/scripts:$PATH
+export PATH=/usr/lib64/mpich/bin:$PATH
+export PATH=/scratch/hdf/install/autotools/bin:$PATH
+
+. $IOD_HOME/config/setcluster.sh
+
+export PATH
+export LD_LIBRARY_PATH
+
+export I_MPI_PLATFORM=auto
+
+# some flags to build the lanl fs-test binary
+export MPI_LD="-lm -L/scratch/iod/lib -liod -ldaos -O0"
+export MPI_INC="-DHAS_PLFS -DHAS_IOD -I/scratch/iod/include -O0"
+
+alias iod='cd $IOD_HOME'
+alias tests='cd $IOD_HOME/tests'
+alias fs='cd $IOD_HOME/fs_test/fs_test'
