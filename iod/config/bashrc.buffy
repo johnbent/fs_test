@@ -1,0 +1,46 @@
+# .bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+        . /etc/bashrc
+fi
+
+AXE_HOME=/scratch/hdf/install/axe
+LD_LIBRARY_PATH=$AXE_HOME/lib:$LD_LIBRARY_PATH
+
+BMI_HOME=/scratch/hdf/bmi/default
+LD_LIBRARY_PATH=$BMI_HOME/lib:$LD_LIBRARY_PATH
+
+MERCURY_HOME=/scratch/hdf/mercury/default
+LD_LIBRARY_PATH=$MERCURY_HOME/lib:$LD_LIBRARY_PATH
+
+LD_LIBRARY_PATH=/scratch/hdf/install/opa/lib:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=/scratch/hdf/build/H5Part/build/lib:$LD_LIBRARY_PATH
+
+export EFF_MPI_IONS=ion01,ion02,ion03,ion04
+EFF_MPI_CNS="10.10.100.101"
+for i in {102..114} 
+do
+	if [ "$i" -eq 106 ] 
+	then
+		continue      # skip stupid 106
+	fi
+	EFF_MPI_CNS=$EFF_MPI_CNS,10.10.100.$i
+done
+export EFF_MPI_CNS
+
+# some flags to build the lanl fs-test binary
+export MPI_LD="-lm -L/scratch/iod/lib -liod -ldaos -O0"
+export MPI_INC="-DHAS_PLFS -DHAS_IOD -I/scratch/iod/include -O0"
+
+export LD_LIBRARY_PATH=/usr/local/lib64:/usr/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/scratch/iod/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/lib64/mpich/lib/:$LD_LIBRARY_PATH
+export C_INCLUDE_PATH=/scratch/iod/include:$C_INCLUDE_PATH
+export CPP_INCLUDE_PATH=/scratch/iod/include:$C_INCLUDE_PATH
+export LIBRARY_PATH=/scratch/iod/lib:$LIBRARY_PATH
+export PATH=/scratch/iod/ff/bin:$PATH
+export PATH=/scratch/iod/bin:$PATH
+export PATH=/scratch/iod/scripts:$PATH
+export PATH=/usr/lib64/mpich/bin:$PATH
+export http_proxy=http://proxyout.lanl.gov:8080 
