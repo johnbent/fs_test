@@ -4,6 +4,10 @@ iodrc="/etc/iodrc"
 [ -f $HOME/.iodrc ] && iodrc=$HOME/.iodrc 
 [[ $IODRC ]] && iodrc=$IODRC
 
+# some variables for installing on buffy
+TOP=/scratch/iod/code
+PREFIXES="/scratch/iod/ /scratch/iod/install/`date +%Y.%m.%e`"
+
 function Clean () {
 	local targdir=$1
 	if test -n "$(find $targdir -maxdepth 1 -name $USER'*' -print -quit)"
