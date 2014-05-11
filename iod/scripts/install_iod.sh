@@ -2,6 +2,7 @@
 
 . /scratch/iod/scripts/funcs.sh
 
+set -e
 
 for PREFIX in $PREFIXES
 do

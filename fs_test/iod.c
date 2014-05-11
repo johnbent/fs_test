@@ -43,7 +43,9 @@ iod_close( iod_state_t *s) {
 		if(ret != 0) {
 			IOD_PRINT_ERR("iod_trans_finish",ret);
 			return ret;
-		} 
+		} else {
+			printf("iod_trans_finish %d: success\n", s->tid);
+		}
 	}
 	MPI_Barrier(s->mcom);
 	
@@ -64,17 +66,19 @@ iod_fini(iod_state_t *s) {
     if(ret != 0) {
 		IOD_PRINT_ERR("iod_container_close",ret);
 		return ret;
- 	}	
+	}
+	MPI_Barrier(s->mcom);
+
+    ret = iod_finalize(hints);
+	if (ret != 0) {
+		IOD_PRINT_ERR("iod_finalize",ret);
+	}
 
 	/* cleanup memory alloc'd in iod_init */
 	if (s->mem_desc) free(s->mem_desc); 
 	if (s->io_desc) free(s->io_desc);
 	if (s->cksum) free (s->cksum);
 
-    ret = iod_finalize(hints);
-	if (ret != 0) {
-		IOD_PRINT_ERR("iod_finalize",ret);
-	}
 	return (int)ret;
 }
 
@@ -85,8 +89,8 @@ iod_sync( iod_state_t *s) {
 
 int
 iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
-	if (s->my_rank != 0) {
-		printf("Init iod with %d ranks\n",s->my_rank,p->num_procs_world);
+	if (s->my_rank == 0) {
+		printf("%d: Init iod with %d ranks\n",s->my_rank,p->num_procs_world);
 	}
 	s->iod_state.mcom = comm;
 	s->iod_state.myrank = s->my_rank;
@@ -181,6 +185,9 @@ open_rd(iod_state_t *s, char *filename, MPI_Comm mcom) {
 	/* start the read trans */
 	if (s->myrank == 0) {
 		ret=iod_trans_start(s->coh, &(s->tid),NULL,0,IOD_TRANS_R,NULL);
+		if(ret != 0) {
+			IOD_PRINT_ERR("iod_obj_open_read", ret);
+		}
 	}
 	MPI_Barrier(mcom);
 
@@ -203,8 +210,11 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 		if ( ret != 0 ) {
 			IOD_PRINT_ERR("iod_trans_start", ret);
 			return ret;
+		} else {
+			printf( "iod_trans_start %d : success\n", I->tid );
 		}
 	}
+	MPI_Barrier(mcom);
 
 	/* create the obj */
 	/* only rank 0 does create then a barrier */

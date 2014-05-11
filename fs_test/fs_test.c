@@ -441,7 +441,7 @@ int parse_command_line(int my_rank, int argc, char *argv[],
               if ( !is_plfs_target ) {
                 struct stat st_temp;
                 char *tfname_dir_part;
-				char *plfsdirname;
+		char *plfsdirname;
 
                 tfname_dir_part = strdup( params->tfname );
                 plfsdirname = dirname( tfname_dir_part );
