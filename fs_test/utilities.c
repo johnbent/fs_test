@@ -1522,6 +1522,9 @@ addDBTimes( int my_rank,
             columns, mixed, "",     op, "file_close_wait_elapsed_time" );
 
     addDBTime( my_rank, num_procs, string_len, columns, values, mixed,
+            times->init_wait_time, op, "init_time" );
+
+    addDBTime( my_rank, num_procs, string_len, columns, values, mixed,
             times->barrier_wait_time, op, "barrier_wait_time" );
 
     addDBTime( my_rank, num_procs, string_len, columns, values, mixed,

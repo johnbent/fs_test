@@ -89,6 +89,10 @@ struct time_values {
     double file_stat_wait_start_time;
     double file_stat_wait_end_time;
     double file_stat_wait_elapsed_time;
+    double init_wait_time; 
+    double init_wait_start_time; 
+    double init_wait_end_time; 
+    double init_wait_elapsed_time;
     double barrier_wait_time; 
     double barrier_wait_start_time; 
     double barrier_wait_end_time; 

@@ -282,11 +282,10 @@ iod_write(iod_state_t *I,char *buf,size_t len,off_t off,ssize_t *bytes) {
 
 	setup_blob_io(len,off,buf,I,WRITE_MODE);
 	ret =iod_blob_write(I->oh,I->tid,hints,I->mem_desc,I->io_desc,I->cksum,event);
-	if ( ret > 0 ) {
-		*bytes = ret;
-		ret = 0;
-	} else {
+	if ( ret != 0 ) {
 		IOD_PRINT_ERR("iod_blob_write",ret);
+	} else {
+		*bytes = len;
 	}
 
 	return ret;
@@ -300,9 +299,8 @@ iod_read(iod_state_t *s, char *buf,size_t len,off_t off,ssize_t *bytes) {
 
 	setup_blob_io(len,off,buf,s,READ_MODE);
 	ret=iod_blob_read(s->oh,s->tid,hints,s->mem_desc,s->io_desc,s->cksum,event);
-	if ( ret > 0 ) {
-		*bytes = ret;
-		ret = 0;
+	if ( ret == 0 ) { // current semantic is 0 for success
+		*bytes = len;
 	} else {
 		IOD_PRINT_ERR("iod_blob_read",ret);
 	}

@@ -330,6 +330,7 @@ collect_and_print_time( int my_rank,
                                    efptr );
 
     // total op time
+    //printf("DEBUG %s:%d %f\n", __FILE__, __LINE__, times->total_op_time);
     collect_and_print_single_time( my_rank,
                                    num_procs,
                                    total_mbs,
@@ -342,6 +343,7 @@ collect_and_print_time( int my_rank,
                                    elapsed_flag=0,
                                    ofptr,
                                    efptr );
+    //printf("DEBUG %s:%d %f\n", __FILE__, __LINE__, times->total_op_time);
 
     // open time
     snprintf( fancy_description, 1024, "File_%s_Open", op );
@@ -450,6 +452,7 @@ collect_and_print_time( int my_rank,
                                ofptr,
                                efptr,
                                &(times->total_op_elapsed_time));
+    //printf("DEBUG %s:%d %f\n", __FILE__, __LINE__, times->total_op_elapsed_time);
     collect_and_print_single_time( my_rank,
                                    num_procs,
                                    total_mbs,
@@ -462,6 +465,7 @@ collect_and_print_time( int my_rank,
                                    elapsed_flag=1,
                                    ofptr,
                                    efptr );
+    //printf("DEBUG %s:%d %f\n", __FILE__, __LINE__, times->total_op_elapsed_time);
 
     // Elapsed File Open Time
     snprintf( fancy_description, 1024, "File_%s_Open", op );

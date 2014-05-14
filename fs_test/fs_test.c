@@ -246,6 +246,7 @@ main( int argc, char *argv[] )
         if ( params.use_db ) {
             db_insert(state.my_rank, 0, NULL,&params,&state,&write_times,NULL,
                     NULL);
+	    //printf("DEBUG %f\n", write_times.total_op_elapsed_time);
         }
     }
 
@@ -830,6 +831,7 @@ init( int argc, char **argv, struct Parameters *params,
     char *pidch;
     char *temp_tfname;
     char *temp_tfname_dir;
+    double init_start;
 
     memset( params, 0, sizeof( *params ) );
     memset( write_times, 0, sizeof( *write_times ) );
@@ -860,6 +862,7 @@ init( int argc, char **argv, struct Parameters *params,
         return -1;
     }
 	#endif
+    init_start = MPI_Wtime();
 
     // tell MPI that we want to handle errors.  This should be good
     // because we always do our own error checking of MPI routines and
@@ -1038,6 +1041,15 @@ init( int argc, char **argv, struct Parameters *params,
 			return -1;
 		#endif
 	}
+
+    setTime( &(write_times->init_wait_time),
+            &(write_times->init_wait_start_time),
+            &(write_times->init_wait_end_time),
+	    0,
+            MPI_Wtime(), init_start,
+            "init_wait_time", __FILE__, __LINE__, 
+            state->efptr, state->my_rank );
+ 
 
     return 0;
 }
@@ -2402,6 +2414,15 @@ read_write_file( struct Parameters *params,
         io_begin + check_buf_time,
         "total_op_time ", 
         __FILE__, __LINE__ , state->efptr, state->my_rank ); 
+//DEBUG: 0.178852 1400083981.349860 1400083981.528712 1400083981.528713 1400083981.349826 0.000034
+/*	
+    printf ("DEBUG: %f %f %f %f %f %f\n",
+    	times->total_op_time,
+        times->total_op_start_time,
+        times->total_op_end_time,
+        MPI_Wtime(),
+        io_begin, check_buf_time);
+*/
 
         
         // check hints, close the file, do barrier, print stats
@@ -2424,12 +2445,14 @@ read_write_file( struct Parameters *params,
         // unshift the rank
     state->my_rank = orig_rank;
 
+    //printf("DEBUG %d %f\n", __LINE__, times->total_op_elapsed_time);
     if(collect_and_print_time(state->my_rank, times, params, state, 
                 (char *)op_name, state->ofptr, state->efptr) != MPI_SUCCESS)
     {
         fatal_error( state->efptr, state->my_rank, 0, NULL, 
                     "collect_and_print_time routine.\n" );
     }
+    //printf("DEBUG %s:%d %f\n", __FILE__, __LINE__, times->total_op_elapsed_time);
 
     /*
      * Only attempt to remove the directories if we've ended a write mode
