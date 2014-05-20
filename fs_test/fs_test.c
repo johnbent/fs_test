@@ -252,7 +252,16 @@ main( int argc, char *argv[] )
 
 #ifdef HAS_PLFS
     // flatten and/or sleep as directed  (flatten is a weird plfs thing)
-    if (params.plfs_flatten) flatten_file(&params,&state,&read_times);
+    if (params.io_type == IO_PLFS && params.plfs_flatten) 
+		flatten_file(&params,&state,&read_times);
+#endif
+
+#ifdef HAS_IOD
+    if (params.io_type == IO_IOD && params.plfs_flatten) {
+		double begin_time = MPI_Wtime();
+		iod_persist(&(state.iod_state));
+		read_times.plfs_flatten_time = MPI_Wtime()-begin_time;
+	}
 #endif
 
     if (params.sleep_seconds) sleep(params.sleep_seconds); 
@@ -687,8 +696,9 @@ int parse_command_line(int my_rank, int argc, char *argv[],
             params->rank_flag && ! params->read_only_flag,
             "Can only use -rank flag in read-only mode" );
     check_illogical_args( params, state, 
-            (( params->plfs_flatten ) && ( !is_plfs_target || params->test_type != 2 )),
-            "Can only use -flatten flag for PLFS targets using N-1 I/O" );
+            (( params->plfs_flatten ) && (!is_plfs_target || params->test_type != 2) 
+				&& params->io_type != IO_IOD ),
+            "Can only use -flatten flag for PLFS targets using N-1 I/O or for IOD" );
     /*
     if ( state->my_rank == 0 ) {
       fprintf( stderr, "Checking illogical args for num_nn_dirs\n" );
@@ -2265,6 +2275,8 @@ report_errs( struct State *state, struct read_error *head ) {
  *   params->plfs_flatten is non-zero (true)
  *   is_plfs_target is non-zero (true)
  *   params->test_type == 2 (N-1 I/O)
+ *
+ * However, we now also use it in IOD mode
  *
  * This call in parse_command_line ensures these conditions are all true:
  *   check_illogical_args( params, state, 

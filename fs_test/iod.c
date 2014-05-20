@@ -11,14 +11,16 @@
 #include "iod.h"
 #include "plfs.h"
 
+#define IOD_RETURN_ON_ERROR(X,Y) { \
+	if (Y != 0 ) { \
+		IOD_PRINT_ERR(X,Y);\
+		return Y; \
+	} \
+}
+
 #define IOD_PRINT_ERR(X,Y) { \
 	fprintf(stderr,"IOD Error in %s:%d on %s: %s\n", \
 		__FILE__, __LINE__, X, strerror(-Y));\
-}
-
-int
-iod_unlink( iod_state_t *s) {
-	return ENOSYS;
 }
 
 int
@@ -32,24 +34,65 @@ iod_close( iod_state_t *s) {
 
 	/* close the object handle */
 	ret = iod_obj_close(s->oh, NULL, NULL);
-	if(ret != 0) {
-		IOD_PRINT_ERR("iod_obj_close",ret);
-		return ret;
-	}
+	IOD_RETURN_ON_ERROR("iod_obj_close",ret);
 
 	/* finish the transaction */
 	if (s->myrank == 0) {
 		ret = iod_trans_finish(s->coh, s->tid, NULL, 0, NULL);
-		if(ret != 0) {
-			IOD_PRINT_ERR("iod_trans_finish",ret);
-			return ret;
-		} else {
-			printf("iod_trans_finish %d: success\n", s->tid);
-		}
+		IOD_RETURN_ON_ERROR("iod_trans_finish",ret);
+		printf("iod_trans_finish %d: success\n", s->tid);
 	}
 	MPI_Barrier(s->mcom);
 	
 	return ret;
+}
+
+int
+iod_persist(iod_state_t *s) {
+
+	iod_ret_t ret = 0;
+	MPI_Barrier(s->mcom);
+	if (s->myrank == 0) {
+		ret = iod_trans_start(s->coh, &(s->tid), NULL, 0, IOD_TRANS_R, NULL);
+		IOD_RETURN_ON_ERROR("iod_trans_start", ret);
+
+		printf("Persist on TR %d\n", s->tid);
+		ret = iod_trans_persist(s->coh, s->tid, NULL, NULL);
+		IOD_RETURN_ON_ERROR("iod_trans_persist", ret);
+
+		ret = iod_trans_finish(s->coh, s->tid, NULL, 0, NULL);
+		IOD_RETURN_ON_ERROR("iod_trans_finish", ret);
+	}
+	MPI_Barrier(s->mcom);
+	return ret;
+}
+
+int
+iod_unlink(iod_state_t *s) {
+/*
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+#if CONTAINER_UNLINK
+    if (mpi_rank == 0) {
+        iod_event_init(ev, eqh);
+        ret = iod_container_unlink(cname, 1, ev);
+        if(ret == 0) {
+            iod_eq_poll(eqh, 0, IOD_EQ_WAIT, 1, &ev_o);
+            assert(ev_o == ev);
+	    if (ev->ev_rc != 0)
+		printf("iod_container_unlink failed, ret: %d (%s).\n",
+		       ev->ev_rc, strerror(-ev->ev_rc));
+        } else {
+	    printf("iod_container_unlink failed, ret: %d (%s).\n",
+                   ret, strerror(-ret));
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+ */
+	return ENOSYS;
 }
 
 int
@@ -63,16 +106,11 @@ iod_fini(iod_state_t *s) {
 
 	/* close the container here */
     iod_ret_t ret = iod_container_close(s->coh, NULL, NULL);
-    if(ret != 0) {
-		IOD_PRINT_ERR("iod_container_close",ret);
-		return ret;
-	}
+	IOD_RETURN_ON_ERROR("iod_container_close",ret);
 	MPI_Barrier(s->mcom);
 
     ret = iod_finalize(hints);
-	if (ret != 0) {
-		IOD_PRINT_ERR("iod_finalize",ret);
-	}
+	IOD_RETURN_ON_ERROR("iod_finalize",ret);
 
 	/* cleanup memory alloc'd in iod_init */
 	if (s->mem_desc) free(s->mem_desc); 
@@ -123,16 +161,10 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 		I->tid = 0;
 		int mpi_size = p->num_procs_world;
 		ret = iod_trans_start(I->coh, &(I->tid), NULL, 0, IOD_TRANS_W, NULL);
-		if(ret != 0) {
-			IOD_PRINT_ERR("iod_trans_start",ret);
-			return ret;
-		}
+		IOD_RETURN_ON_ERROR("iod_trans_start",ret);
 		printf( "About to finish tid=0 on container %s with %d ranks\n", target, p->num_procs_world );
 		ret = iod_trans_finish(I->coh, I->tid, NULL, 0, NULL);
-		if(ret != 0) {
-			IOD_PRINT_ERR("iod_trans_finish",ret);
-			return ret;
-		}
+		IOD_RETURN_ON_ERROR("iod_trans_finish",ret);
 	}
 
 	/* setup the io and memory descriptors used for blob io */
@@ -161,9 +193,7 @@ create_obj(iod_handle_t coh, iod_trans_id_t tid, iod_obj_id_t *oid, iod_obj_type
 	printf("Creating obj type %d %lli\n", type, *oid);
 	int ret = iod_obj_create(coh, tid, hints, type, NULL, 
 			structure, oid, NULL);
-	if (ret != 0) {
-		IOD_PRINT_ERR("iod_obj_create",ret);
-	}
+	IOD_RETURN_ON_ERROR("iod_obj_create",ret);
 	return ret;
 }
 
@@ -185,16 +215,12 @@ open_rd(iod_state_t *s, char *filename, MPI_Comm mcom) {
 	/* start the read trans */
 	if (s->myrank == 0) {
 		ret=iod_trans_start(s->coh, &(s->tid),NULL,0,IOD_TRANS_R,NULL);
-		if(ret != 0) {
-			IOD_PRINT_ERR("iod_obj_open_read", ret);
-		}
+		IOD_RETURN_ON_ERROR("iod_obj_open_read", ret);
 	}
 	MPI_Barrier(mcom);
 
 	ret = iod_obj_open_read(s->coh, s->oid, s->tid, NULL, &(s->oh), NULL);
-	if(ret != 0) {
-		IOD_PRINT_ERR("iod_obj_open_read", ret);
-	}
+	IOD_RETURN_ON_ERROR("iod_obj_open_read", ret);
 	return ret;
 }
 
@@ -207,12 +233,8 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	I->tid++;
 	if (I->myrank == 0) {
 		ret = iod_trans_start(I->coh, &(I->tid), NULL, 0, IOD_TRANS_W, NULL);
-		if ( ret != 0 ) {
-			IOD_PRINT_ERR("iod_trans_start", ret);
-			return ret;
-		} else {
-			printf( "iod_trans_start %d : success\n", I->tid );
-		}
+		IOD_RETURN_ON_ERROR("iod_trans_start", ret);
+		printf( "iod_trans_start %d : success\n", I->tid );
 	}
 	MPI_Barrier(mcom);
 
@@ -237,11 +259,8 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	MPI_Barrier(mcom);
 
 	/* now open the obj */
-	if ((ret = iod_obj_open_write(I->coh, I->oid, I->tid, NULL, &(I->oh), NULL)) < 0) {
-		IOD_PRINT_ERR("iod_obj_open_write", ret);
-	} else {
-		ret = 0;
-	}
+	ret = iod_obj_open_write(I->coh, I->oid, I->tid, NULL, &(I->oh), NULL);
+	IOD_RETURN_ON_ERROR("iod_obj_open_write", ret);
 	return ret;	
 }
 
@@ -263,10 +282,7 @@ setup_blob_io(size_t len, off_t off, char *buf, iod_state_t *s, int rw) {
 		if (rw==WRITE_MODE) {
 			plfs_error_t pret;
 			pret  = plfs_get_checksum(buf,len,(Plfs_checksum*)s->cksum);
-			if(pret != 0) {
-				IOD_PRINT_ERR("plfs_get_checksum", pret);
-				return pret;
-			}
+			IOD_RETURN_ON_ERROR("plfs_get_checksum", pret);
 		} else {
 			memset(s->cksum,0,sizeof(*(s->cksum)));
 		}
@@ -282,11 +298,8 @@ iod_write(iod_state_t *I,char *buf,size_t len,off_t off,ssize_t *bytes) {
 
 	setup_blob_io(len,off,buf,I,WRITE_MODE);
 	ret =iod_blob_write(I->oh,I->tid,hints,I->mem_desc,I->io_desc,I->cksum,event);
-	if ( ret != 0 ) {
-		IOD_PRINT_ERR("iod_blob_write",ret);
-	} else {
-		*bytes = len;
-	}
+	IOD_RETURN_ON_ERROR("iod_blob_write",ret); // successful write returns zero
+	*bytes = len;
 
 	return ret;
 }
@@ -308,10 +321,7 @@ iod_read(iod_state_t *s, char *buf,size_t len,off_t off,ssize_t *bytes) {
 	if (s->params.checksum) {
 		plfs_error_t pret = 0;
 		pret = plfs_checksum_match(buf,len,(Plfs_checksum)(*s->cksum));
-		if (pret != 0) {
-			IOD_PRINT_ERR("plfs_checksum_match", pret);
-			ret = pret;
-		}
+		IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
 	}
 	return ret; 
 }
