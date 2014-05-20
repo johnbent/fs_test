@@ -101,7 +101,7 @@ int read_write_file( struct Parameters *params,
 
 void flatten_file( struct Parameters *,struct State *, struct time_values *);
 #endif
-void fini( struct Parameters *params, struct State *state );
+void fini( struct Parameters *params, struct State *state, int error );
 void Usage( struct Parameters *params, struct State *state, char *field,
             char *missing );
 void print_time(const char *what, struct State *state);
@@ -280,18 +280,18 @@ main( int argc, char *argv[] )
         db_insert(state.my_rank, 0, "NULL", &params, &state, NULL, NULL, NULL );
     }
     print_time("end", &state );
-    fini( &params, &state );
+    fini( &params, &state, 0 );
     return 0;
 }
 
 void
-fini( struct Parameters *params, struct State *state ) {
+fini( struct Parameters *params, struct State *state, int error ) {
 
     if (params->ofname != NULL && state->my_rank == 0)   fclose(state->ofptr);
     if (params->efname != NULL)   fclose(state->efptr);
 
 	#ifdef HAS_IOD
-    if ( params->io_type == IO_IOD ) {
+    if ( params->io_type == IO_IOD && !error) {
 		iod_fini(&(state->iod_state));
 	}
 	#endif
@@ -1607,7 +1607,7 @@ Usage( struct Parameters *params, struct State *state, char *which_field,
                     missing );
         }
     }
-    fini( params, state);
+    fini( params, state, 1);
 }
 
 // returns whether or not it barriered
