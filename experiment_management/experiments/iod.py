@@ -8,7 +8,7 @@ mpi_program = ("/scratch/iod/fs_test/fs_test/fs_test.%s.x"
 mpi_options = {
   #"np" : [ 1,2,3,4,5,6,7,8,9,10,11,12,13,14,16,18,20,22,24,26,28,42,56,70,84 ],
   #"hostfile" : [ "/scratch/iod/tests/machinefile" ],
-  "np" : [ 11 ],
+  "np" : [ 4 ],
   "hosts" : [ os.getenv("EFF_MPI_IONS") ]
 }
 
@@ -16,12 +16,15 @@ program_options = {
   "size"     : [ 1024, 2048, 4096, 8192, "16K", "32K", 65536, "128K", "256K", "512K", "1M", "2M", "4M", "8M"],
   #"nobj"    : [ 4096 ],
   "time"  : [ 10 ],
+  "check" : [ 2 ],
+  "touch" : [ 2 ],
   "shift"    : [ '' ],
   "deletefile" : [ '' ],
+  "flatten" : [ 1 ],
   #"experiment" : [ 'iod.' + str(int(time.time())) ],
-  "experiment" : [ '%s.iod6.iodonly.iosizing' % os.getenv( "MY_MPI_HOST" )],
+  "experiment" : [ '%s.iod7.flattening.mlog_off.touch_on.daos_buffering_on.threadpoolsize16' % os.getenv( "MY_MPI_HOST" )],
   "barriers"   : [ 'aopen,bclose' ],
-  "noextra" : [ '' ],
+  #"noextra" : [ '' ],
 }
 
 def get_commands( expr_mgmt_options ):
