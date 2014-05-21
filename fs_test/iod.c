@@ -11,6 +11,19 @@
 #include "iod.h"
 #include "plfs.h"
 
+#define IDEBUG(rank, format, ...)                     \
+do {                                    \
+    int _rank = (rank);                         \
+                                    \
+    if (_rank == 0) {                          \
+        fprintf(stdout, "%.2f IOD DEBUG (%s:%d): %d: : "       \
+            format"\n", MPI_Wtime(), \
+            __FILE__, __LINE__, rank,       \
+            ##__VA_ARGS__);         \
+        fflush(stdout);                     \
+    }                                   \
+} while (0);
+
 #define IOD_RETURN_ON_ERROR(X,Y) { \
 	if (Y != 0 ) { \
 		IOD_PRINT_ERR(X,Y);\
@@ -40,7 +53,7 @@ iod_close( iod_state_t *s) {
 	if (s->myrank == 0) {
 		ret = iod_trans_finish(s->coh, s->tid, NULL, 0, NULL);
 		IOD_RETURN_ON_ERROR("iod_trans_finish",ret);
-		printf("iod_trans_finish %d: success\n", s->tid);
+		IDEBUG(s->myrank,"iod_trans_finish %d: success", s->tid);
 	}
 	MPI_Barrier(s->mcom);
 	
@@ -56,7 +69,7 @@ iod_persist(iod_state_t *s) {
 		ret = iod_trans_start(s->coh, &(s->tid), NULL, 0, IOD_TRANS_R, NULL);
 		IOD_RETURN_ON_ERROR("iod_trans_start", ret);
 
-		printf("Persist on TR %d\n", s->tid);
+		IDEBUG(s->myrank,"Persist on TR %d", s->tid);
 		ret = iod_trans_persist(s->coh, s->tid, NULL, NULL);
 		IOD_RETURN_ON_ERROR("iod_trans_persist", ret);
 
@@ -127,9 +140,7 @@ iod_sync( iod_state_t *s) {
 
 int
 iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
-	if (s->my_rank == 0) {
-		printf("%d: Init iod with %d ranks\n",s->my_rank,p->num_procs_world);
-	}
+        IDEBUG(s->my_rank,"%d: Init iod with %d ranks",s->my_rank,p->num_procs_world);
 	s->iod_state.mcom = comm;
 	s->iod_state.myrank = s->my_rank;
 	int ret = iod_initialize(comm, NULL, 
@@ -147,22 +158,20 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 
 	/* open and create the container here */
 	char *target = expand_path( p->tfname, p->test_time, p->num_nn_dirs, s );
-	if (!s->my_rank) {
-		printf( "About to open container %s with %d ranks\n", 
+        IDEBUG(s->my_rank, "About to open container %s with %d ranks", 
 				target, p->num_procs_world );
-	}
 	ret = iod_container_open(target, con_open_hint, IOD_CONT_CREATE|IOD_CONT_RW,
 							 &(I->coh), NULL);
 	if ( ret != 0 ) return ret;
 
 	/* skip TID=0 */
 	if (!s->my_rank) { 
-		printf( "About to start tid=0 on container %s with %d ranks\n", target, p->num_procs_world );
+		IDEBUG(s->my_rank,"About to start tid=0 on container %s with %d ranks", target, p->num_procs_world );
 		I->tid = 0;
 		int mpi_size = p->num_procs_world;
 		ret = iod_trans_start(I->coh, &(I->tid), NULL, 0, IOD_TRANS_W, NULL);
 		IOD_RETURN_ON_ERROR("iod_trans_start",ret);
-		printf( "About to finish tid=0 on container %s with %d ranks\n", target, p->num_procs_world );
+		IDEBUG(s->my_rank,"About to finish tid=0 on container %s with %d ranks", target, p->num_procs_world );
 		ret = iod_trans_finish(I->coh, I->tid, NULL, 0, NULL);
 		IOD_RETURN_ON_ERROR("iod_trans_finish",ret);
 	}
@@ -176,10 +185,12 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 
 	/* setup the checksum used for blob */
 	if (s->iod_state.params.checksum) {
+            IDEBUG(s->my_rank, "Using checksums");
 		s->iod_state.cksum = malloc(sizeof(iod_checksum_t));
 		assert(s->iod_state.cksum);
 
 	} else {
+            IDEBUG(s->my_rank, "Not using checksums");
 		s->iod_state.cksum = NULL;
 	}
 
@@ -188,9 +199,9 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 
 static int
 create_obj(iod_handle_t coh, iod_trans_id_t tid, iod_obj_id_t *oid, iod_obj_type_t type, 
-		iod_array_struct_t *structure, iod_hint_list_t *hints) 
+		iod_array_struct_t *structure, iod_hint_list_t *hints, int rank) 
 {
-	printf("Creating obj type %d %lli\n", type, *oid);
+	IDEBUG(rank,"Creating obj type %d %lli", type, *oid);
 	int ret = iod_obj_create(coh, tid, hints, type, NULL, 
 			structure, oid, NULL);
 	IOD_RETURN_ON_ERROR("iod_obj_create",ret);
@@ -234,7 +245,7 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	if (I->myrank == 0) {
 		ret = iod_trans_start(I->coh, &(I->tid), NULL, 0, IOD_TRANS_W, NULL);
 		IOD_RETURN_ON_ERROR("iod_trans_start", ret);
-		printf( "iod_trans_start %d : success\n", I->tid );
+		IDEBUG(I->myrank,"iod_trans_start %d : success", I->tid );
 	}
 	MPI_Barrier(mcom);
 
@@ -249,12 +260,12 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	if( !I->myrank ) {
 		iod_hint_list_t *hints = NULL;
 		set_checksum(&hints,P->checksum);
-		ret = create_obj(I->coh, I->tid, &(I->oid), I->otype, NULL, hints);
+		ret = create_obj(I->coh, I->tid, &(I->oid), I->otype, NULL, hints,I->myrank);
 		if (hints) free(hints);
 		if ( ret != 0 ) {
 			return ret;
 		} else {
-			printf("iod obj %lli created successfully.\n",I->oid);
+			IDEBUG(I->myrank,"iod obj %lli created successfully.",I->oid);
 		}
 	}
 	MPI_Barrier(mcom);
