@@ -242,7 +242,8 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	/* only rank 0 does create then a barrier */
 	/* alternatively everyone does create, most fail with EEXIST, no barrier */
 	I->otype = IOD_OBJ_BLOB;
-	I->oid = 0;
+        srand(time(NULL));
+	I->oid = rand()%1024; // make a random one to make sure that striping works
 	IOD_OBJID_SETOWNER_APP(I->oid)
 	IOD_OBJID_SETTYPE(I->oid, IOD_OBJ_BLOB);
 	if( !I->myrank ) {
