@@ -258,10 +258,13 @@ main( int argc, char *argv[] )
 
 #ifdef HAS_IOD
     if (params.io_type == IO_IOD && params.plfs_flatten) {
-		double begin_time = MPI_Wtime();
-		iod_persist(&(state.iod_state));
-		read_times.plfs_flatten_time = MPI_Wtime()-begin_time;
-	}
+            double begin_time = MPI_Wtime();
+            iod_persist(&(state.iod_state));
+            read_times.plfs_flatten_time = MPI_Wtime()-begin_time;
+            if (state.my_rank==0) {
+                printf("IOD Persist Time: %.2f\n",read_times.plfs_flatten_time);
+            }
+    }
 #endif
 
     if (params.sleep_seconds) sleep(params.sleep_seconds); 
