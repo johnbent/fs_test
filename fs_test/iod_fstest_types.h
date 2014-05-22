@@ -14,7 +14,7 @@ typedef struct iod_state_s {
 	iod_trans_id_t tid;
 	iod_handle_t coh;
 	iod_handle_t oh;
-    iod_obj_id_t oid; 
+        iod_obj_id_t oid; 
 	iod_obj_type_t otype;
 	iod_parameters_t params;
 	iod_blob_iodesc_t *io_desc;
