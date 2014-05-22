@@ -1,0 +1,75 @@
+This program fails somewhere in IOD when a transaction is persisted.
+
+Sometimes it fails when Transaction 3 (Step 0) is persisted.
+Sometimes it fails when Transaction 4 (Step 1) is persisted.
+I've never had it get beyond that.  I've done about 6 runs on May 21 after Jeff updated the IOD and HDF5 to current versions.
+
+The logs in LogsFromFailedRun are from a run that failed when Transaction 4 was being persisted.
+The file iod.debug.log-18817-nid00006-1400710859 in LogsFromFailedRun/IOD_LOGS contains the WTF messages about missing files 
+
+The file LogsFromFailedRun/OUTPUT_LOG show the output from the script.  
+There are some errors and messages early on that are expected and can be ignored.  
+The failure corresponds to this part of the log:
+
+Persist After Step 1 Transaction 4
+HDF5-DIAG: Error detected in HDF5 (1.9.176) MPI-process 0:
+  #000: H5RC.c line 558 in H5RCpersist(): failed to request a persist on a read context on container
+    major: File accessibilty
+    minor: Unable to initialize object
+  #001: H5VLiod.c line 9187 in H5VL_iod_rc_persist(): failed to create and ship VOL op
+    major: Symbol table
+    minor: Unable to initialize object
+  #002: H5VLiod_client.c line 1595 in H5VL_iod_request_complete(): Failed to Read Context OP
+
+    major: Function entry/exit
+    minor: Unable to initialize object
+vpicio_uni: vpicio_uni.c:330: main: Assertion `H5RCpersist(temp_rc, -1) == 0' failed.
+ 
+
+-----
+To reproduce the problem,  run the script vpicio.cn64-ion8-p1-s6-r1.sh found in this directory.
+
+I run from ion1.
+cd to this dir; then
+./vpicio.cn64-ion8-p1-s6-r1.sh >& OUTPUT_LOG
+
+You can monitor OUTPUT_LOG from another screen on ion0 to see progress.   
+The HDF5 server & some client messages appear in files in ff_output (which is created if not already in existence)
+
+I believe I have opened up the write permission sufficiently so you can run here.  
+But, you can also copy the script and run it from anywhere.
+
+I have a bare-bones .bashrc (see below) & do not use any setup from /scratch/iod/* or elsewhere.
+
+There are 2 things I do that you should as well to replicate my environment:
+
+1) I have my own .plfsrc, copied from /etc/rc into /home/ruth/.plfsrc.  It's edited to enable DEBUG level output from IOD.
+
+2) On the IONs, you should have this in your environment:
+MPICH_GNI_NDREG_LAZYMEM=disabled
+
+Since this applications runs the ff_server on the IONs and the vpicio_uni application on the CNs, in my .bashrc I have
+
+# .bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+
+# User specific aliases and functions 
+
+# OS-specific (ION or CN/BU-LOGIN)
+if [ -f /usr/local/ff/ruth/RC_FILES/bashrc ]; then
+	. /usr/local/ff/ruth/RC_FILES/bashrc
+fi
+
+
+The /user/local/ff/ruth/RC_FILES/bashrc on the IONs has this:
+#  my per-arch .basrc defines;   This is for IONs
+export MPICH_GNI_NDREG_LAZYMEM=disabled
+
+on the CNs (and buffy) the file exists but is empty.
+
+
+
