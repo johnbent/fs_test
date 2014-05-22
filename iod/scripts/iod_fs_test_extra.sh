@@ -4,6 +4,8 @@
 source /scratch/iod/scripts/funcs.sh
 
 awk '/^central_io_buffering/ {print "daos_buffering "$2} \
+         /^iod_max_persist/ {print} \
+         /^iod_daos_stripe_mbs/ {print} \
 	 /^iod_threadpool_size/  {print} \
 	 /^iod_checksum/ {print} \
 	' $iodrc
@@ -11,4 +13,4 @@ awk '/^central_io_buffering/ {print "daos_buffering "$2} \
 
 # plfs_check_config finds plfsrc for us
 plfs_check_config | awk '/^Threadpool/ {print "plfs_threads "$3} \
-						 /^Max index/  {print "plfs_cksum_sz " $5}'
+			 /^Max index/  {print "plfs_cksum_sz " $5}'
