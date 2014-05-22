@@ -2135,8 +2135,10 @@ db_insert(  int my_rank,
             MPI_Abort( MPI_COMM_WORLD, -1 );
         }
         if ( initial ) {
+            // use ignore because often we just append to same file and source
+            // it multiple times which produces annoying unnecessary mysql errs
             ret = snprintf( query, FULL_QUERY_SIZE, 
-                    "INSERT INTO %s (%s) VALUES (%s)", 
+                    "INSERT IGNORE INTO %s (%s) VALUES (%s)", 
                 table, columns, values ); 
         } else {
             ret = snprintf( query, FULL_QUERY_SIZE, 
