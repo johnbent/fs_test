@@ -8,6 +8,7 @@ awk '/^central_io_buffering/ {print "daos_buffering "$2} \
          /^iod_daos_stripe_mbs/ {print} \
 	 /^iod_threadpool_size/  {print} \
 	 /^iod_checksum/ {print} \
+         /^iod_shards_per_target/ {print} \
 	' $iodrc
 #egrep 'threadpool|checksum|buffering' /etc/iodrc | grep -v '^#'
 
