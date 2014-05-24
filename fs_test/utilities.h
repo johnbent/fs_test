@@ -261,7 +261,7 @@ struct Parameters {
   int    numthreads;
   int    totalthreads;
   int    thread_write;
-
+  int    iod_checksum; // so it gets into db
 };
 
 

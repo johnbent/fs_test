@@ -420,6 +420,7 @@ int parse_command_line(int my_rank, int argc, char *argv[],
 		case 'c':
 			printf("Using iod checksums\n");
 			state->iod_state.params.checksum = 1;
+                        params->iod_checksum = 1;
 			break;
 #endif
         case 'd':   

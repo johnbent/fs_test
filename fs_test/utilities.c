@@ -2010,6 +2010,8 @@ db_insert(  int my_rank,
                 "strided" );
             addDBInt( QUERY_SIZE, columns, values, mixed, params->sync_flag,   
                 "sync" );
+            addDBInt( QUERY_SIZE, columns, values, mixed, params->iod_checksum,   
+                "iod_checksum" );
             addDBInt( QUERY_SIZE, columns, values,mixed,params->write_only_flag,
                 "write_only");
             addDBInt( QUERY_SIZE, columns, values, mixed,params->read_only_flag,
