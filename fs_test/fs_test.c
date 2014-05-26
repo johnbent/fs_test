@@ -118,8 +118,8 @@ struct myoption mylongopts[] = {
         "0 don't fill buffer nor verify, 1 check first byte in each block,\n"
         "\t2 check first byte in each page, 3 check every byte"           },
 #ifdef HAS_IOD
-	{ "iodcksum",    no_argument,        NULL,							 'c',
-		"Whether to use IOD checksumming\n",							  }, 
+	{ "iodcksum",    required_argument,        NULL,	        'c',
+		"Whether to use IOD checksumming\n",		          }, 
 #endif
     { "num_nn_dirs", required_argument,  NULL,                           'd',
         "For non-PLFS N-N I/O, number of subdirectories for files"        },
@@ -417,11 +417,10 @@ int parse_command_line(int my_rank, int argc, char *argv[],
             params->barriers = strdup( optarg );
             break;
 #ifdef HAS_IOD
-		case 'c':
-			printf("Using iod checksums\n");
-			state->iod_state.params.checksum = 1;
-                        params->iod_checksum = 1;
-			break;
+        case 'c':
+            params->iod_checksum = atoi(optarg);
+            state->iod_state.params.checksum = params->iod_checksum;
+	    break;
 #endif
         case 'd':   
             temp_int = atoi( optarg );
