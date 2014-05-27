@@ -18,6 +18,7 @@ typedef struct iod_state_s {
 	iod_obj_type_t otype;
 	iod_parameters_t params;
 	iod_blob_iodesc_t *io_desc;
+        iod_kv_t kv;
 	iod_mem_desc_t *mem_desc;
 	iod_checksum_t *cksum;
 	MPI_Comm mcom;

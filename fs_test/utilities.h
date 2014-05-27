@@ -262,6 +262,7 @@ struct Parameters {
   int    totalthreads;
   int    thread_write;
   int    iod_checksum; // so it gets into db
+  char * iod_type;     // so it gets into db
 };
 
 

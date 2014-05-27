@@ -114,13 +114,15 @@ struct myoption mylongopts[] = {
     { "barriers",   required_argument,  NULL,                            'b',
     "When to barrier.  Comma seperated.\n"
     "\te.g. -barriers bopen,aopen,bwrite,awrite,bread,aread,bclose,bsync,async,btrunc,atrunc,bstat,astat,aclose" },
-    { "check",      required_argument,  NULL,                           'C',
-        "0 don't fill buffer nor verify, 1 check first byte in each block,\n"
-        "\t2 check first byte in each page, 3 check every byte"           },
 #ifdef HAS_IOD
+        { "iodtype", required_argument, NULL,                           'B',
+    "IOD only.  What type of object: kv|blob|array",                      },
 	{ "iodcksum",    required_argument,        NULL,	        'c',
 		"Whether to use IOD checksumming\n",		          }, 
 #endif
+    { "check",      required_argument,  NULL,                           'C',
+        "0 don't fill buffer nor verify, 1 check first byte in each block,\n"
+        "\t2 check first byte in each page, 3 check every byte"           },
     { "num_nn_dirs", required_argument,  NULL,                           'd',
         "For non-PLFS N-N I/O, number of subdirectories for files"        },
     { "errout",     required_argument,  NULL,                            'e',
@@ -417,6 +419,10 @@ int parse_command_line(int my_rank, int argc, char *argv[],
             params->barriers = strdup( optarg );
             break;
 #ifdef HAS_IOD
+        case 'B':
+            params->iod_type = strdup( optarg ); 
+            iod_set_otype(&(state->iod_state),optarg);
+	    break;
         case 'c':
             params->iod_checksum = atoi(optarg);
             state->iod_state.params.checksum = params->iod_checksum;
@@ -1048,7 +1054,9 @@ init( int argc, char **argv, struct Parameters *params,
 			printf("iod_initialize failed rc: %d, exit.\n", ret);
 			assert(0);
 		} else {
+                    if (state->my_rank==0) {
 			printf("IOD_initialized\n");
+                    }
 		}
 		#else
 			return -1;

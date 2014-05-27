@@ -11,6 +11,9 @@
 #include "iod.h"
 #include "plfs.h"
 
+// kv objects use an array of two checksums
+#define NUM_CKSUMS 2
+
 #define IDEBUG(rank, format, ...)                     \
 do {                                    \
     int _rank = (rank);                         \
@@ -58,6 +61,18 @@ iod_close( iod_state_t *s) {
 	MPI_Barrier(s->mcom);
 	
 	return ret;
+}
+
+int
+iod_set_otype( iod_state_t *s, const char *type ) {
+    if (strcmp(type,"blob")==0) {
+        s->otype = IOD_OBJ_BLOB;
+    } else if (strcmp(type,"kv")==0) {
+        s->otype = IOD_OBJ_KV;
+    } else {
+        assert(strcmp(type,"array")==0);
+        s->otype = IOD_OBJ_ARRAY;
+    }
 }
 
 int
@@ -186,7 +201,7 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 	/* setup the checksum used for blob */
 	if (s->iod_state.params.checksum) {
             IDEBUG(s->my_rank, "Using checksums");
-		s->iod_state.cksum = malloc(sizeof(iod_checksum_t));
+		s->iod_state.cksum = malloc(sizeof(iod_checksum_t) * NUM_CKSUMS);
 		assert(s->iod_state.cksum);
 
 	} else {
@@ -249,14 +264,20 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	}
 	MPI_Barrier(mcom);
 
+        if (I->otype == IOD_OBJ_INVALID) {
+            // this means that the user didn't specify and it's left 0 by the memset(0)
+            I->otype = IOD_OBJ_BLOB;
+        }
+
+        assert(I->otype != IOD_OBJ_ARRAY);
+
 	/* create the obj */
 	/* only rank 0 does create then a barrier */
 	/* alternatively everyone does create, most fail with EEXIST, no barrier */
-	I->otype = IOD_OBJ_BLOB;
         srand(time(NULL));
 	I->oid = rand()%1024; // make a random one to make sure that striping works
 	IOD_OBJID_SETOWNER_APP(I->oid)
-	IOD_OBJID_SETTYPE(I->oid, IOD_OBJ_BLOB);
+	IOD_OBJID_SETTYPE(I->oid, I->otype);
 	if( !I->myrank ) {
 		iod_hint_list_t *hints = NULL;
 		set_checksum(&hints,P->checksum);
@@ -276,9 +297,38 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	return ret;	
 }
 
-int
-setup_blob_io(size_t len, off_t off, char *buf, iod_state_t *s, int rw) { 
 
+int
+setup_cksum(iod_state_t *s, char *buf, size_t len, int rw, off_t off) {
+    /* setup the checksum */
+    if (s->params.checksum) {
+        if (rw==WRITE_MODE) {
+            plfs_error_t pret;
+            switch(s->otype) {
+            case IOD_OBJ_BLOB:
+                pret  = plfs_get_checksum(buf,len,(Plfs_checksum*)s->cksum);
+                IOD_RETURN_ON_ERROR("plfs_get_checksum", pret);
+                break;
+            case IOD_OBJ_KV:
+                pret  = plfs_get_checksum((char*)&off,sizeof(off_t),
+                    (Plfs_checksum*)&(s->cksum[0]));
+                IOD_RETURN_ON_ERROR("plfs_get_checksum", pret);
+                pret  = plfs_get_checksum(buf,len,(Plfs_checksum*)&(s->cksum[1]));
+                IOD_RETURN_ON_ERROR("plfs_get_checksum", pret);
+                break;
+            default:
+                assert(s->otype != IOD_OBJ_ARRAY);
+                break;
+            }
+        } else {
+                memset(s->cksum,0,sizeof(iod_checksum_t) * NUM_CKSUMS);
+        }
+    }
+    return 0;
+}
+
+void
+setup_blob_io(size_t len, off_t off, char *buf, iod_state_t *s) { 
 	/* where is the IO directed in the object */
 	s->io_desc->nfrag = 1;
 	s->io_desc->frag[0].len = len;
@@ -288,30 +338,48 @@ setup_blob_io(size_t len, off_t off, char *buf, iod_state_t *s, int rw) {
 	s->mem_desc->nfrag = 1;
 	s->mem_desc->frag[0].addr = (void*)buf;
 	s->mem_desc->frag[0].len = len;
-
-	/* setup the checksum */
-	if (s->params.checksum) {
-		if (rw==WRITE_MODE) {
-			plfs_error_t pret;
-			pret  = plfs_get_checksum(buf,len,(Plfs_checksum*)s->cksum);
-			IOD_RETURN_ON_ERROR("plfs_get_checksum", pret);
-		} else {
-			memset(s->cksum,0,sizeof(*(s->cksum)));
-		}
-	}
 }
 
+void
+setup_kv_io(size_t len, off_t *off, char *buf, iod_state_t *s) {
+    s->kv.key = (void *)off;
+    s->kv.key_len = (iod_size_t)sizeof(*off);
+    s->kv.value = (void*)buf;
+    s->kv.value_len = (iod_size_t)len;
+}
 
 int 
 iod_write(iod_state_t *I,char *buf,size_t len,off_t off,ssize_t *bytes) {
 	iod_ret_t ret;
 	iod_hint_list_t *hints = NULL;
 	iod_event_t *event = NULL;
+        //iod_checksum_t cs[2];
+        //cs[0] = cs[1] = NULL;
 
-	setup_blob_io(len,off,buf,I,WRITE_MODE);
-	ret =iod_blob_write(I->oh,I->tid,hints,I->mem_desc,I->io_desc,I->cksum,event);
-	IOD_RETURN_ON_ERROR("iod_blob_write",ret); // successful write returns zero
-	*bytes = len;
+        ret = setup_cksum(I, buf, len, WRITE_MODE, off);
+        IOD_RETURN_ON_ERROR("setup_cksum",ret); 
+
+        switch(I->otype) {
+        case IOD_OBJ_BLOB:
+            setup_blob_io(len,off,buf,I);
+            ret =iod_blob_write(I->oh,I->tid,hints,I->mem_desc,I->io_desc,I->cksum,event);
+            IOD_RETURN_ON_ERROR("iod_blob_write",ret); // successful write returns zero
+            *bytes = len;
+            break;
+        case IOD_OBJ_KV:
+            assert(len <= IOD_KV_VALUE_MAXLEN);
+            setup_kv_io(len,&off,buf,I);
+            //IDEBUG(I->myrank,"BEGIN iod_kv_set");
+            ret = iod_kv_set(I->oh,I->tid,hints,&(I->kv),I->cksum,event);
+            IOD_RETURN_ON_ERROR("iod_kv_set",ret); // successful write returns zero
+            //IDEBUG(I->myrank,"END iod_kv_set: %d", ret);
+            *bytes = len;
+            break;
+        default:
+            assert(I->otype == IOD_OBJ_BLOB);
+            break;
+        }
+
 
 	return ret;
 }
@@ -321,21 +389,46 @@ iod_read(iod_state_t *s, char *buf,size_t len,off_t off,ssize_t *bytes) {
 	iod_hint_list_t *hints = NULL;
 	iod_event_t *event = NULL;
 	iod_ret_t ret = 0;
+        plfs_error_t pret = 0;
 
-	setup_blob_io(len,off,buf,s,READ_MODE);
-	ret=iod_blob_read(s->oh,s->tid,hints,s->mem_desc,s->io_desc,s->cksum,event);
-	if ( ret == 0 ) { // current semantic is 0 for success
-		*bytes = len;
-	} else {
-		IOD_PRINT_ERR("iod_blob_read",ret);
-	}
-	
-	if (s->params.checksum) {
-		plfs_error_t pret = 0;
-		pret = plfs_checksum_match(buf,len,(Plfs_checksum)(*s->cksum));
-		IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
-	}
-	return ret; 
+        assert(s->otype != IOD_OBJ_ARRAY);
+
+        ret = setup_cksum(s, buf, len, READ_MODE, off);
+        IOD_RETURN_ON_ERROR("setup_cksum",ret); 
+
+        switch(s->otype) {
+        case IOD_OBJ_BLOB:
+            setup_blob_io(len,off,buf,s);
+            ret=iod_blob_read(s->oh,s->tid,hints,s->mem_desc,s->io_desc,s->cksum,event);
+            IOD_RETURN_ON_ERROR("iod_blob_read",ret); // successful read returns zero
+            *bytes = len;
+            if (s->params.checksum) {
+                    pret = plfs_checksum_match(buf,len,(Plfs_checksum)(*s->cksum));
+                    IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
+            }
+            break;
+        case IOD_OBJ_KV:
+            assert(len <= IOD_KV_VALUE_MAXLEN);
+            setup_kv_io(len,&off,buf,s);
+            //IDEBUG(s->myrank,"BEGIN iod_kv_get");
+            ret = iod_kv_get_value(s->oh, s->tid, s->kv.key, s->kv.key_len, 
+                    s->kv.value, &(s->kv.value_len), s->cksum, event);
+		 //iod_size_t keylen, char *value, iod_size_t *len,
+		 //iod_checksum_t *cs, iod_event_t *event);
+            IOD_RETURN_ON_ERROR("iod_kv_get",ret); // successful write returns zero
+            //IDEBUG(s->myrank,"END iod_kv_get: %d", ret);
+            *bytes = len;
+            if (s->params.checksum) {
+                    // not currently checking key
+                    pret = plfs_checksum_match(buf,len,(Plfs_checksum)(*(&(s->cksum[1]))));
+                    IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
+            }
+            break;
+        default:
+            assert(s->otype != IOD_OBJ_ARRAY);
+            break;
+        }
+    return ret; 
 }
 
 int
