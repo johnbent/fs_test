@@ -421,7 +421,6 @@ int parse_command_line(int my_rank, int argc, char *argv[],
 #ifdef HAS_IOD
         case 'B':
             params->iod_type = strdup( optarg ); 
-            iod_set_otype(&(state->iod_state),optarg);
 	    break;
         case 'c':
             params->iod_checksum = atoi(optarg);
@@ -1053,10 +1052,6 @@ init( int argc, char **argv, struct Parameters *params,
 		if (ret != 0) {
 			printf("iod_initialize failed rc: %d, exit.\n", ret);
 			assert(0);
-		} else {
-                    if (state->my_rank==0) {
-			printf("IOD_initialized\n");
-                    }
 		}
 		#else
 			return -1;

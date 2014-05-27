@@ -11,9 +11,6 @@
 #include "iod.h"
 #include "plfs.h"
 
-// kv objects use an array of two checksums
-#define NUM_CKSUMS 2
-
 #define IDEBUG(rank, format, ...)                     \
 do {                                    \
     int _rank = (rank);                         \
@@ -65,7 +62,9 @@ iod_close( iod_state_t *s) {
 
 int
 iod_set_otype( iod_state_t *s, const char *type ) {
-    if (strcmp(type,"blob")==0) {
+    if (type == NULL) {
+        s->otype = IOD_OBJ_BLOB; 
+    } else if (strcmp(type,"blob")==0) {
         s->otype = IOD_OBJ_BLOB;
     } else if (strcmp(type,"kv")==0) {
         s->otype = IOD_OBJ_KV;
@@ -73,6 +72,7 @@ iod_set_otype( iod_state_t *s, const char *type ) {
         assert(strcmp(type,"array")==0);
         s->otype = IOD_OBJ_ARRAY;
     }
+    IDEBUG(s->myrank, "OBJ Type is %s", type);
 }
 
 int
@@ -130,22 +130,23 @@ iod_trunc(iod_state_t *s) {
 
 int
 iod_fini(iod_state_t *s) {
-	iod_hint_list_t *hints = NULL;
+    iod_hint_list_t *hints = NULL;
 
 	/* close the container here */
     iod_ret_t ret = iod_container_close(s->coh, NULL, NULL);
-	IOD_RETURN_ON_ERROR("iod_container_close",ret);
-	MPI_Barrier(s->mcom);
+    IOD_RETURN_ON_ERROR("iod_container_close",ret);
+    MPI_Barrier(s->mcom);
 
     ret = iod_finalize(hints);
-	IOD_RETURN_ON_ERROR("iod_finalize",ret);
+    IOD_RETURN_ON_ERROR("iod_finalize",ret);
 
-	/* cleanup memory alloc'd in iod_init */
-	if (s->mem_desc) free(s->mem_desc); 
-	if (s->io_desc) free(s->io_desc);
-	if (s->cksum) free (s->cksum);
+    /* cleanup memory alloc'd in iod_init */
+    if (s->mem_desc) free(s->mem_desc); 
+    if (s->io_desc) free(s->io_desc);
+    if (s->cksum) free (s->cksum);
+    if (s->array) teardown_array(s);
 
-	return (int)ret;
+    return (int)ret;
 }
 
 int
@@ -191,23 +192,36 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 		IOD_RETURN_ON_ERROR("iod_trans_finish",ret);
 	}
 
+        iod_set_otype(I,p->iod_type);
+
 	/* setup the io and memory descriptors used for blob io */
-	s->iod_state.mem_desc = 
+	I->mem_desc = 
 		malloc(sizeof(iod_mem_desc_t) + sizeof(iod_mem_frag_t));
-	s->iod_state.io_desc = 
+	I->io_desc = 
 		malloc(sizeof(iod_blob_iodesc_t) + sizeof(iod_blob_iofrag_t));
-	assert(s->iod_state.mem_desc && s->iod_state.io_desc);
+	assert(I->mem_desc && I->io_desc);
 
-	/* setup the checksum used for blob */
-	if (s->iod_state.params.checksum) {
+	/* setup the checksums */ 
+	if (I->params.checksum) {
             IDEBUG(s->my_rank, "Using checksums");
-		s->iod_state.cksum = malloc(sizeof(iod_checksum_t) * NUM_CKSUMS);
-		assert(s->iod_state.cksum);
-
+		I->cksum = malloc(sizeof(iod_checksum_t) * iod_num_cksums(I->otype));
+		assert(I->cksum);
 	} else {
             IDEBUG(s->my_rank, "Not using checksums");
-		s->iod_state.cksum = NULL;
+		I->cksum = NULL;
 	}
+
+        /* setup the array */
+        if (I->otype == IOD_OBJ_ARRAY) {
+            setup_array(I, p->obj_size);
+        } else {
+            I->array = NULL;
+        }
+
+        if (I->otype == IOD_OBJ_KV && p->obj_size > IOD_KV_VALUE_MAXLEN) {
+            assert(p->obj_size <= IOD_KV_VALUE_MAXLEN);
+            return EFBIG;
+        }
 
 	return ret;
 }
@@ -223,6 +237,7 @@ create_obj(iod_handle_t coh, iod_trans_id_t tid, iod_obj_id_t *oid, iod_obj_type
 	return ret;
 }
 
+/* TODO : move this into init */
 int
 set_checksum(iod_hint_list_t **hints, int checksum) {
 	if (checksum) {
@@ -264,13 +279,6 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	}
 	MPI_Barrier(mcom);
 
-        if (I->otype == IOD_OBJ_INVALID) {
-            // this means that the user didn't specify and it's left 0 by the memset(0)
-            I->otype = IOD_OBJ_BLOB;
-        }
-
-        assert(I->otype != IOD_OBJ_ARRAY);
-
 	/* create the obj */
 	/* only rank 0 does create then a barrier */
 	/* alternatively everyone does create, most fail with EEXIST, no barrier */
@@ -281,7 +289,7 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	if( !I->myrank ) {
 		iod_hint_list_t *hints = NULL;
 		set_checksum(&hints,P->checksum);
-		ret = create_obj(I->coh, I->tid, &(I->oid), I->otype, NULL, hints,I->myrank);
+		ret = create_obj(I->coh, I->tid, &(I->oid), I->otype, I->array, hints,I->myrank);
 		if (hints) free(hints);
 		if ( ret != 0 ) {
 			return ret;
@@ -294,18 +302,66 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	/* now open the obj */
 	ret = iod_obj_open_write(I->coh, I->oid, I->tid, NULL, &(I->oh), NULL);
 	IOD_RETURN_ON_ERROR("iod_obj_open_write", ret);
+
 	return ret;	
+}
+
+int
+setup_array(iod_state_t *I, size_t io_size) {
+    IDEBUG(I->myrank, "Setting up array\n");
+    int num_dims = 1;   /* 1D for now */
+    /* make the array structure */
+    I->array = (iod_array_struct_t *)malloc(sizeof(iod_array_struct_t));
+    assert(I->array);
+    I->array->cell_size = io_size;
+    I->array->num_dims = num_dims; 
+    I->array->firstdim_max    = IOD_DIMLEN_UNLIMITED;
+    I->array->chunk_dims = NULL;
+    I->array->current_dims = (iod_size_t*)malloc(sizeof(iod_size_t) * num_dims);
+    assert(I->array->current_dims);
+    I->array->current_dims[0] = IOD_DIMLEN_UNLIMITED;
+
+    /* make the hyperslab structure */
+    I->slab = (iod_hyperslab_t*)malloc(sizeof(iod_hyperslab_t));
+    I->slab->start  = (iod_size_t*)malloc(sizeof(iod_size_t)*num_dims);
+    I->slab->count  = (iod_size_t*)malloc(sizeof(iod_size_t)*num_dims);
+    I->slab->stride = (iod_size_t*)malloc(sizeof(iod_size_t)*num_dims);
+    I->slab->block  = (iod_size_t*)malloc(sizeof(iod_size_t)*num_dims);
+}
+
+int
+teardown_array(iod_state_t *I) {
+    if (I->array) {
+        free(I->array->current_dims);
+        free(I->array);
+    }
+    if (I->slab) {
+        free(I->slab->start);
+        free(I->slab->count);
+        free(I->slab->stride);
+        free(I->slab->block);
+        free(I->slab);
+    }
+}
+
+int
+iod_num_cksums(iod_obj_type_t otype) {
+    /* KV objs use 2 checksums per IO whereas blob/array only one */
+    return (otype == IOD_OBJ_KV ? 2 : 1);
 }
 
 
 int
 setup_cksum(iod_state_t *s, char *buf, size_t len, int rw, off_t off) {
+    int ncksums = iod_num_cksums(s->otype);
+
     /* setup the checksum */
     if (s->params.checksum) {
         if (rw==WRITE_MODE) {
             plfs_error_t pret;
             switch(s->otype) {
             case IOD_OBJ_BLOB:
+            case IOD_OBJ_ARRAY:
                 pret  = plfs_get_checksum(buf,len,(Plfs_checksum*)s->cksum);
                 IOD_RETURN_ON_ERROR("plfs_get_checksum", pret);
                 break;
@@ -317,15 +373,36 @@ setup_cksum(iod_state_t *s, char *buf, size_t len, int rw, off_t off) {
                 IOD_RETURN_ON_ERROR("plfs_get_checksum", pret);
                 break;
             default:
-                assert(s->otype != IOD_OBJ_ARRAY);
+                assert(0);
                 break;
             }
         } else {
-                memset(s->cksum,0,sizeof(iod_checksum_t) * NUM_CKSUMS);
+                memset(s->cksum,0,sizeof(iod_checksum_t) * ncksums);
         }
     }
     return 0;
 }
+
+void
+setup_mem_desc(iod_state_t *s, char *buf, off_t len) {
+    /* from whence does the IO come in memory */
+    s->mem_desc->nfrag = 1;
+    s->mem_desc->frag[0].addr = (void*)buf;
+    s->mem_desc->frag[0].len = len;
+}
+        
+
+void
+setup_array_io(size_t len, off_t off, char *buf, iod_state_t *s) { 
+    size_t which_cell = off / len;
+    //IDEBUG(s->myrank,"Off %ld is cell %ld when cellsize is %ld",off,which_cell,len);
+    s->slab->start[0]  = which_cell;
+    s->slab->count[0]  = 1;
+    s->slab->stride[0] = 1;
+    s->slab->block[0]  = 1;
+    setup_mem_desc(s, buf, len);
+}
+
 
 void
 setup_blob_io(size_t len, off_t off, char *buf, iod_state_t *s) { 
@@ -333,11 +410,8 @@ setup_blob_io(size_t len, off_t off, char *buf, iod_state_t *s) {
 	s->io_desc->nfrag = 1;
 	s->io_desc->frag[0].len = len;
 	s->io_desc->frag[0].offset = off;
-	
-	/* from whence does the IO come in memory */
-	s->mem_desc->nfrag = 1;
-	s->mem_desc->frag[0].addr = (void*)buf;
-	s->mem_desc->frag[0].len = len;
+        
+        setup_mem_desc(s, buf, len);
 }
 
 void
@@ -367,67 +441,74 @@ iod_write(iod_state_t *I,char *buf,size_t len,off_t off,ssize_t *bytes) {
             *bytes = len;
             break;
         case IOD_OBJ_KV:
-            assert(len <= IOD_KV_VALUE_MAXLEN);
             setup_kv_io(len,&off,buf,I);
-            //IDEBUG(I->myrank,"BEGIN iod_kv_set");
             ret = iod_kv_set(I->oh,I->tid,hints,&(I->kv),I->cksum,event);
             IOD_RETURN_ON_ERROR("iod_kv_set",ret); // successful write returns zero
-            //IDEBUG(I->myrank,"END iod_kv_set: %d", ret);
+            *bytes = len;
+            break;
+        case IOD_OBJ_ARRAY:
+            setup_array_io(len,off,buf,I);
+            ret = iod_array_write(I->oh,I->tid,hints,I->mem_desc,I->slab,I->cksum,event);
+            IOD_RETURN_ON_ERROR("iod_array_write",ret); // successful write returns zero
             *bytes = len;
             break;
         default:
-            assert(I->otype == IOD_OBJ_BLOB);
+            assert(0);
             break;
         }
-
 
 	return ret;
 }
 
 int 
 iod_read(iod_state_t *s, char *buf,size_t len,off_t off,ssize_t *bytes) {
-	iod_hint_list_t *hints = NULL;
-	iod_event_t *event = NULL;
-	iod_ret_t ret = 0;
+    iod_hint_list_t *hints = NULL;
+    iod_event_t *event = NULL;
+    iod_ret_t ret = 0;
+
+    ret = setup_cksum(s, buf, len, READ_MODE, off);
+    IOD_RETURN_ON_ERROR("setup_cksum",ret); 
+
+    switch(s->otype) {
+    case IOD_OBJ_ARRAY:
+        setup_array_io(len,off,buf,s);
+        ret = iod_array_read(s->oh,s->tid,hints,s->mem_desc,s->slab,s->cksum,event);
+        IOD_RETURN_ON_ERROR("iod_array_read",ret); // successful read returns zero
+        *bytes = len;
+        break;
+    case IOD_OBJ_BLOB:
+        setup_blob_io(len,off,buf,s);
+        ret=iod_blob_read(s->oh,s->tid,hints,s->mem_desc,s->io_desc,s->cksum,event);
+        IOD_RETURN_ON_ERROR("iod_blob_read",ret); // successful read returns zero
+        *bytes = len;
+        break;
+    case IOD_OBJ_KV:
+        setup_kv_io(len,&off,buf,s);
+        ret = iod_kv_get_value(s->oh, s->tid, s->kv.key, s->kv.key_len, 
+                s->kv.value, &(s->kv.value_len), s->cksum, event);
+        IOD_RETURN_ON_ERROR("iod_kv_get",ret); // successful write returns zero
+        *bytes = len;
+        break;
+    default:
+        assert(0);
+        break;
+    }
+
+    if (s->params.checksum) {
         plfs_error_t pret = 0;
-
-        assert(s->otype != IOD_OBJ_ARRAY);
-
-        ret = setup_cksum(s, buf, len, READ_MODE, off);
-        IOD_RETURN_ON_ERROR("setup_cksum",ret); 
-
-        switch(s->otype) {
-        case IOD_OBJ_BLOB:
-            setup_blob_io(len,off,buf,s);
-            ret=iod_blob_read(s->oh,s->tid,hints,s->mem_desc,s->io_desc,s->cksum,event);
-            IOD_RETURN_ON_ERROR("iod_blob_read",ret); // successful read returns zero
-            *bytes = len;
-            if (s->params.checksum) {
-                    pret = plfs_checksum_match(buf,len,(Plfs_checksum)(*s->cksum));
-                    IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
-            }
-            break;
-        case IOD_OBJ_KV:
-            assert(len <= IOD_KV_VALUE_MAXLEN);
-            setup_kv_io(len,&off,buf,s);
-            //IDEBUG(s->myrank,"BEGIN iod_kv_get");
-            ret = iod_kv_get_value(s->oh, s->tid, s->kv.key, s->kv.key_len, 
-                    s->kv.value, &(s->kv.value_len), s->cksum, event);
-		 //iod_size_t keylen, char *value, iod_size_t *len,
-		 //iod_checksum_t *cs, iod_event_t *event);
-            IOD_RETURN_ON_ERROR("iod_kv_get",ret); // successful write returns zero
-            //IDEBUG(s->myrank,"END iod_kv_get: %d", ret);
-            *bytes = len;
-            if (s->params.checksum) {
-                    // not currently checking key
-                    pret = plfs_checksum_match(buf,len,(Plfs_checksum)(*(&(s->cksum[1]))));
-                    IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
-            }
-            break;
-        default:
-            assert(s->otype != IOD_OBJ_ARRAY);
-            break;
+        if (s->otype == IOD_OBJ_KV) {
+            pret = plfs_checksum_match((char*)&off,sizeof(off_t),
+                                (Plfs_checksum)(*(&(s->cksum[0]))));
+            IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
+            pret = plfs_checksum_match(buf,len,
+                                (Plfs_checksum)(*(&(s->cksum[1]))));
+            IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
+        } else {
+            pret = plfs_checksum_match(buf,len,(Plfs_checksum)(*s->cksum));
+            IOD_RETURN_ON_ERROR("plfs_checksum_match", pret);
         }
+    }
+
     return ret; 
 }
 
