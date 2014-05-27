@@ -213,7 +213,15 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 
         /* setup the array */
         if (I->otype == IOD_OBJ_ARRAY) {
-            setup_array(I, p->obj_size);
+            size_t cell_size, total_sz, last_cell;
+            cell_size = p->obj_size;
+            total_sz = cell_size * p->num_objs * p->num_procs_world;
+            last_cell = (total_sz / cell_size);
+            if (p->time_limit) {
+                IDEBUG(s->my_rank, "Unknown last cell. Setting array sz unlimited.");
+                last_cell = IOD_DIMLEN_UNLIMITED;
+            }
+            setup_array(I, cell_size, last_cell);
         } else {
             I->array = NULL;
         }
@@ -307,7 +315,7 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 }
 
 int
-setup_array(iod_state_t *I, size_t io_size) {
+setup_array(iod_state_t *I, size_t io_size, size_t last_cell) {
     IDEBUG(I->myrank, "Setting up array\n");
     int num_dims = 1;   /* 1D for now */
     /* make the array structure */
@@ -319,7 +327,9 @@ setup_array(iod_state_t *I, size_t io_size) {
     I->array->chunk_dims = NULL;
     I->array->current_dims = (iod_size_t*)malloc(sizeof(iod_size_t) * num_dims);
     assert(I->array->current_dims);
-    I->array->current_dims[0] = IOD_DIMLEN_UNLIMITED;
+    
+    I->array->current_dims[0] = last_cell;
+    IDEBUG(I->myrank, "Current dim is %ld\n", I->array->current_dims[0]);
 
     /* make the hyperslab structure */
     I->slab = (iod_hyperslab_t*)malloc(sizeof(iod_hyperslab_t));
