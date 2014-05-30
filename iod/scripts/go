@@ -1,0 +1,45 @@
+#! /usr/bin/perl
+
+# this script is used by a function in ~/.bashrc
+# this allows me to just type go Nest and find myself teleported to the dir
+
+$IOD    = "/scratch/iod"; 
+$CODE   = "$IOD/code";
+$HOME   = "$ENV{'HOME'}";
+$YEAR   = (localtime(time))[5] + 1900;
+$target = $ARGV[0];
+
+%targets = (
+    code    => "$CODE",
+    dior    => "/home/jlombard/ior/src",
+    expr    => "$CODE/fs_test/experiment_management",
+    fs      => "$CODE/fs_test/fs_test",
+    iod     => "$IOD",
+    ior     => "$IOD/ior/src",
+    plfs    => "$CODE/iod/src/dep/plfs/",
+    scripts => "$IOD/scripts",
+    tests   => "$IOD/tests/",
+    tmp     => "/tmp",
+);
+
+if ( ! $target || length($target) == 0 ) {
+    print "# Possible go targets:\n";
+    foreach my $key ( sort keys %targets ) {
+        printf "# %10s -> $targets{$key}\n", $key;
+    }
+    exit;
+}
+
+if ( defined $targets{$target} ) {
+    print "$targets{$target}";
+} else {
+    foreach my $key ( sort keys %targets ) {
+        if ( $key =~ /^$target/ ) {
+            print "$targets{$key}";
+            exit;
+        }
+    }
+    # no substring match. 
+    print "$target";
+}
+
