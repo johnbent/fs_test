@@ -424,6 +424,8 @@ main(int argc, char **argv) {
 	ENDTIME(starttime,duration);	
 	add_time(mpi_rank, "iod_cont_query", duration);
 
+    MPI_Barrier(MPI_COMM_WORLD);
+
 	STARTTIME(starttime);
 	close_container(coh);
 	ENDTIME(starttime,duration);
