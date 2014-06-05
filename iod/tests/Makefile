@@ -1,8 +1,8 @@
 # LIBRARY_BUILD
-INSTALL_ROOT = /scratch/iod
+INSTALL_ROOT=/scratch/iod/
 CFLAGS += -g -I${INSTALL_ROOT}/include -O0
 #CFLAGS += -g -Wall -Werror -I${INSTALL_ROOT}/include 
-LDLIBS += -L${INSTALL_ROOT}/lib -liod -lplfs -lpthread -ldaos
+LDLIBS += -L${INSTALL_ROOT}/lib -liod -lplfs -lpthread 
 CPPFLAGS = ${CFLAGS}
 
 C_SRCS = $(wildcard *.c) 
