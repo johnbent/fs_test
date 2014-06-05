@@ -33,6 +33,8 @@ int silence = 0;
 #define OUTPUT_BUFSZ 4096
 char final_output[OUTPUT_BUFSZ];
 
+char hostname[1024];
+
 class Average {
 	public:
 		Average() { quantity = sum = 0; }
@@ -194,8 +196,10 @@ parse_options(int argc, char** argv, int ranks)
         }
     }
 
-	snprintf(final_output, OUTPUT_BUFSZ, "%s | ranks %d | file %s | cells %d | cellsz %d | steps %d | persist %d | cksums %d",
-		argv[0], ranks, cname, num_elmts, cell_size, num_steps, persist_rate, enable_cksums );
+    char hostname[1024];
+    gethostname(hostname,1024);
+	snprintf(final_output, OUTPUT_BUFSZ, "%s | host %s | ranks %d | file %s | cells %d | cellsz %d | steps %d | persist %d | cksums %d",
+		argv[0], hostname, ranks, cname, num_elmts, cell_size, num_steps, persist_rate, enable_cksums );
     return( 0 );
 }
 
@@ -217,6 +221,8 @@ main(int argc, char **argv) {
     iod_hint_list_t *con_open_hint = NULL;
     iod_hint_list_t *obj_create_hint = NULL;
     iod_ret_t ret;
+
+    gethostname(hostname,1024);
 
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &multi_thread_provide);
     if (multi_thread_provide != MPI_THREAD_MULTIPLE) {
@@ -271,7 +277,8 @@ main(int argc, char **argv) {
 	ENDTIME(starttime,duration);
 	add_time(mpi_rank, "iod_container_open", duration);
     if(ret != 0) {
-        fprintf(stderr, "iod_container_open w create failed, ret: %d (%s).\n",
+        fprintf(stderr, "%s : iod_container_open w create failed, ret: %d (%s).\n",
+		
                ret, strerror(-ret));
         assert(0);
     }
