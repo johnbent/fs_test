@@ -36,6 +36,7 @@ convert_sz {
 
 sub
 insert {
+  #print "$_[0] -> $_[1]\n";
   $result{$_[0]} = "'$_[1]'";
 }
 
@@ -91,6 +92,11 @@ while(<>) {
     insert('total_size_mb', convert_sz($1,$2,1048576));
   } elsif (/^Max (Write)/ or /^Max (Read)/) {
     insert("max_" .lc($1), $tokens[2]);
+  } elsif (/\s+IOD Persist Time: (.+) Bandwidth MB\/s: (.+)$/) {
+    insert('persist_time', $1);
+    insert('persist_bw', $2);
+  } elsif (/\s+IOD (iod_.+_time) = (.+)$/) {
+    insert($1,$2);
   } elsif (/^Finished: (.*)$/) {
     my $end = toepoch($1);
     my ($begin) = $result{'epoch'} =~ /(\d+)/;
