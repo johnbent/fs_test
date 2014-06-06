@@ -316,7 +316,7 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 
 int
 setup_array(iod_state_t *I, size_t io_size, size_t last_cell) {
-    IDEBUG(I->myrank, "Setting up array\n");
+    IDEBUG(I->myrank, "Setting up array");
     int num_dims = 1;   /* 1D for now */
     /* make the array structure */
     I->array = (iod_array_struct_t *)malloc(sizeof(iod_array_struct_t));
@@ -329,7 +329,7 @@ setup_array(iod_state_t *I, size_t io_size, size_t last_cell) {
     assert(I->array->current_dims);
     
     I->array->current_dims[0] = last_cell;
-    IDEBUG(I->myrank, "Current dim is %ld\n", I->array->current_dims[0]);
+    IDEBUG(I->myrank, "Current dim is %ld", I->array->current_dims[0]);
 
     /* make the hyperslab structure */
     I->slab = (iod_hyperslab_t*)malloc(sizeof(iod_hyperslab_t));

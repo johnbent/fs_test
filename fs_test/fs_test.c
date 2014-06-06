@@ -1303,7 +1303,9 @@ open_file(  struct Parameters *params,
 		mpi_ret = iod_open( params, state, target, read_write, comm_file );
 		MPI_Barrier(comm_file);
 		if ( mpi_ret != 0 ) {
-			printf( "Don't know how to do IOD open yet.\n");
+                        char hostname[1024];
+                        gethostname(hostname,1024);
+			printf( "Error on %s in IOD open.\n", hostname);
 			assert(0);
 		} else {
 			success = 1;
