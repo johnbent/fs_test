@@ -161,6 +161,7 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 	s->iod_state.myrank = s->my_rank;
 	int ret = iod_initialize(comm, NULL, 
 			p->num_procs_world, p->num_procs_world );
+        IOD_RETURN_ON_ERROR("iod_initialize", ret);
 
 	iod_state_t *I = &(s->iod_state);
 
@@ -173,15 +174,18 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 	*/
 
 	/* open and create the container here */
-	char *target = expand_path( p->tfname, p->test_time, p->num_nn_dirs, s );
+	char *target = expand_path( p->tfname, p->test_time, p->num_nn_dirs, s);
         IDEBUG(s->my_rank, "About to open container %s with %d ranks", 
 				target, p->num_procs_world );
-	ret = iod_container_open(target, con_open_hint, IOD_CONT_CREATE|IOD_CONT_RW,
-							 &(I->coh), NULL);
-	if ( ret != 0 ) return ret;
+        unsigned int mode = IOD_CONT_CREATE | IOD_CONT_RW;
+        if (p->read_only_flag) mode = IOD_CONT_RW;
+	ret = iod_container_open(target, con_open_hint, mode, &(I->coh), NULL);
+        IOD_RETURN_ON_ERROR("iod_container_open", ret);
 
 	/* skip TID=0 */
 	if (!s->my_rank) { 
+            if (!p->read_only_flag){
+                // in read-only mode, no need to skip tid==0
 		IDEBUG(s->my_rank,"About to start tid=0 on container %s with %d ranks", target, p->num_procs_world );
 		I->tid = 0;
 		int mpi_size = p->num_procs_world;
@@ -190,9 +194,16 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 		IDEBUG(s->my_rank,"About to finish tid=0 on container %s with %d ranks", target, p->num_procs_world );
 		ret = iod_trans_finish(I->coh, I->tid, NULL, 0, NULL);
 		IOD_RETURN_ON_ERROR("iod_trans_finish",ret);
+            }
 	}
 
+        // set the oid now here as well so it's availabe in -op read mode
         iod_set_otype(I,p->iod_type);
+        srand(time(NULL));
+	//I->oid = rand()%1024; // make a random one to make sure that striping works
+        I->oid = 0;     // set to rank for N-N . . . 
+	IOD_OBJID_SETOWNER_APP(I->oid)
+	IOD_OBJID_SETTYPE(I->oid, I->otype);
 
 	/* setup the io and memory descriptors used for blob io */
 	I->mem_desc = 
@@ -264,7 +275,8 @@ open_rd(iod_state_t *s, char *filename, MPI_Comm mcom) {
 	/* start the read trans */
 	if (s->myrank == 0) {
 		ret=iod_trans_start(s->coh, &(s->tid),NULL,0,IOD_TRANS_R,NULL);
-		IOD_RETURN_ON_ERROR("iod_obj_open_read", ret);
+                IDEBUG(s->myrank,"start read trans %d: %d", s->tid, ret);
+		IOD_RETURN_ON_ERROR("iod_trans_start", ret);
 	}
 	MPI_Barrier(mcom);
 
@@ -290,10 +302,6 @@ open_wr(iod_state_t *I, char *filename, MPI_Comm mcom) {
 	/* create the obj */
 	/* only rank 0 does create then a barrier */
 	/* alternatively everyone does create, most fail with EEXIST, no barrier */
-        srand(time(NULL));
-	I->oid = rand()%1024; // make a random one to make sure that striping works
-	IOD_OBJID_SETOWNER_APP(I->oid)
-	IOD_OBJID_SETTYPE(I->oid, I->otype);
 	if( !I->myrank ) {
 		iod_hint_list_t *hints = NULL;
 		set_checksum(&hints,P->checksum);
@@ -527,9 +535,12 @@ iod_open(struct Parameters *p, struct State *s, char *filename, int read_write,M
 	int ret = 0;
 
 	if ( read_write == WRITE_MODE ) {
-		return open_wr(&(s->iod_state),filename,mcom);
+            return open_wr(&(s->iod_state),filename,mcom);
 	} else {
-		return open_rd(&(s->iod_state),filename,mcom);
+            if (p->read_only_flag) {
+                s->iod_state.tid = 1;
+            }
+            return open_rd(&(s->iod_state),filename,mcom);
 	}
 
 }
