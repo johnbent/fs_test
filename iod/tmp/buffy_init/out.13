@@ -1,0 +1,11 @@
+  nid00006:  0 /  13       iod_initialize success took    0.0635 s
+  nid00006:  0 /  13          MPI_Barrier success took    0.0003 s
+  nid00006:  0 /  13   iod_container_open success took   14.6379 s
+  nid00006:  0 /  13          MPI_Barrier success took    0.3659 s
+  nid00006:  0 /  13      iod_trans_start success took    0.1070 s
+  nid00006:  0 /  13     iod_trans_finish success took   24.1139 s
+  nid00006:  0 /  13          MPI_Barrier success took    0.0000 s
+  nid00006:  0 /  13  iod_container_close success took    4.1023 s
+  nid00006:  0 /  13          MPI_Barrier success took    0.6847 s
+  nid00006:  0 /  13         iod_finalize success took    0.1078 s
+  nid00006:  0 /  13          MPI_Barrier success took    0.0950 s
