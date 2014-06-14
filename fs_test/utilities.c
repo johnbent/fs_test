@@ -2155,8 +2155,10 @@ db_insert(  int my_rank,
                 // add additional info to only clear if set to partial
                 // so if someone else (like in negative number) set a 
                 // non-fatal error, we won't overwrite.
+                // use ignore because often we just append to same file and source
+                // it multiple times which produces annoying unnecessary mysql errs
             int ret = snprintf( query, FULL_QUERY_SIZE, 
-                "UPDATE %s set error = NULL WHERE %s AND error like 'partial'",
+                "UPDATE IGNORE %s set error = NULL WHERE %s AND error like 'partial'",
                 table, params->db_key ); 
             suppress_reminder = 1;  // a reminder was just set after the read
             error_handler = 1;  // only rank 0 should send this one

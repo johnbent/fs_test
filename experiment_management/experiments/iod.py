@@ -21,7 +21,7 @@ program_options = {
   "nobj"    : [ 6144 ],
   #"time"  : [ 10 ],
   "check" : [ 2 ],
-  "iodcksum" : [ '' ],
+  "iodcksum" : [ 0, 1 ],
   "touch" : [ 2 ],
   "shift"    : [ '' ],
   "deletefile" : [ '' ],
