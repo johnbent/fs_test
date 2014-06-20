@@ -284,6 +284,7 @@ main(int argc, char **argv) {
     }
 
 	/* skipping the weird tid=0 */
+  STARTTIME(starttime);
     tid = 0;
     ret = iod_trans_start(coh, &tid, NULL, mpi_size, IOD_TRANS_W, NULL);
     if(ret != 0) {
@@ -297,6 +298,8 @@ main(int argc, char **argv) {
                ret, strerror(-ret));
         assert(0);
     }
+	ENDTIME(starttime,duration);
+  add_time(mpi_rank,"iod_skip_tid0", duration);
 
 	/* setting up the write buffer */
     warray = (uint32_t*)malloc(cell_size*num_elmts);

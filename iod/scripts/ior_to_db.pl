@@ -81,8 +81,8 @@ while(<>) {
     insert($1, convert_sz($2,$3,1));
   } elsif (/(aios)\s*= (.*)$/) {
     insert($1,$2);
-  } elsif (/(daos persist)\s*= (.*)$/) {
-    insert(join('_',split(' ',$1)), $2 =~ /TRUE/ ? "1" : "0");
+  } elsif (/^IOD Persist Time: (.*)$/) {
+    insert('persist_time', $1); 
   } elsif (/(repititions)\s*= (.*)$/) {
     insert($1,$2);
   } elsif (/(blocksize)\s*= (\d+) (.*)$/) {

@@ -7,6 +7,8 @@ reserve () {
 		nodes=`echo $EFF_UPPER | sed 's/ /,/g'`	
 	elif [ $1 == "lower" ]; then
 		nodes=`echo $EFF_LOWER | sed 's/ /,/g'`	
+        elif [ $1 == "all" ]; then
+		nodes=`echo $EFF_LOWER $EFF_UPPER | sed 's/ /,/g'`	
 	else 
 		nodes=$1
 	fi
@@ -27,10 +29,10 @@ elif [[ "$1" == "return" || "$1" == "ret" ]]; then
 		echo $res
 		scontrol delete Reservation=$res
 	done
-elif [[ "$1" == "upper" || "$1" == "lower" ]]; then
+elif [[ "$1" == "upper" || "$1" == "lower" || "$1" == "all" ]]; then
 	reserve $1
 else 
-	echo "Usage: $0 get [nodes] | return | list | upper | lower"
+	echo "Usage: $0 get [nodes] | return | list | upper | lower | all"
 	echo "  e.g. $0 get 8,10-12"
 fi
 

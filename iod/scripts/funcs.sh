@@ -6,13 +6,13 @@ iodrc="/etc/iodrc"
 
 # some variables for installing on buffy
 TOP=/scratch/iod/code
-PREFIXES="/scratch/iod/ /scratch/iod/install/`date +%Y.%m.%e`"
+PREFIXES="/scratch/iod/install/`date +%Y.%m.%d` /scratch/iod/"
 
 function Clean () {
 	local targdir=$1
-	if test -n "$(find $targdir -maxdepth 1 -name $USER'*' -print -quit)"
+	if test -n "$(find $targdir -maxdepth 1 -name $USER\* -print -quit)"
 	then
-		local count=`ls $targdir/$USER* | wc -l`
+		local count=`ls -l $targdir/$USER* | wc -l`
 		echo "Cleaning $count entries in $HOSTNAME:$targdir"
 		/bin/rm -rf $targdir/$USER*
 	else

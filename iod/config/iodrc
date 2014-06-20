@@ -1,8 +1,11 @@
-iod_checksum_chunk_bytes 2097152
-# central_io_buffering is whether to use DAOS_OBJ_IO_BUFFERED
+iod_daos_stripe_mbs 128 
+iod_checksum_chunk_bytes 1048576 
+iod_max_persist_memory_mbs 16 
+#iod_persist_workitem_mbs 8 
 central_io_buffering     0
-iod_root                 /tmp/iod_root
-iod_threadpool_size      8
-mount_point              /tmp/iod_plfs
+iod_root                 /mnt/iod_root
+iod_threadpool_size      16
+mount_point              /mnt/iod_plfs
 central_path             /mnt/daos
-iod_shards_per_target	1
+iod_shards_per_target 1 
+  

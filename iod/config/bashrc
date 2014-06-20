@@ -18,9 +18,9 @@ if [ "$HOSTNAME" != lhn.lola.whamcloud.com ]; then
     module load mpich-x86_64
 fi
 
-IOD_HOME=/scratch/iod/
+IOD_HOME=/scratch/iod
 export IOD_INSTALL=$IOD_HOME
-#export IOD_INSTALL=/scratch/iod/install/2014.05.22
+#export IOD_INSTALL=/scratch/iod/install/2014.05.28
 AXE_HOME=/scratch/hdf/install/axe
 LD_LIBRARY_PATH=$AXE_HOME/lib:$LD_LIBRARY_PATH
 
@@ -38,7 +38,7 @@ LD_LIBRARY_PATH=$IOD_INSTALL/lib:$LD_LIBRARY_PATH
 export C_INCLUDE_PATH=$IOD_INSTALL/include:$C_INCLUDE_PATH
 export CPP_INCLUDE_PATH=$IOD_INSTALL/include:$C_INCLUDE_PATH
 export LIBRARY_PATH=$IOD_INSTALL/lib:$LIBRARY_PATH
-PATH=$IOD_INSTALL/bin:$IOD_INSTALL/scripts:$IOD_INSTALL/sbin:$PATH
+PATH=$IOD_INSTALL/bin:$IOD_HOME/scripts:$IOD_INSTALL/sbin:$PATH
 PATH=/usr/lib64/mpich/bin:$PATH
 PATH=/scratch/hdf/install/autotools/bin:$PATH
 export PATH
@@ -56,6 +56,6 @@ export I_MPI_PLATFORM=auto
 
 # some flags to build the lanl fs-test binary
 export MY_MPI_HOST="lola"
-export MPI_LD="-lm -L/scratch/iod/lib -liod -O0"
-export MPI_INC="-DHAS_PLFS -DHAS_IOD -I/scratch/iod/include -O0 -DMYSQL_FILE=/scratch/iod/output/$MY_MPI_HOST.fs_test.db"
-export FS_TEST_EXTRA="/scratch/iod/scripts/iod_fs_test_extra.sh"
+export MPI_LD="-lm -L$IOD_INSTALL/lib -liod -O0"
+export MPI_INC="-DHAS_PLFS -DHAS_IOD -I$IOD_INSTALL/include -O0 -DMYSQL_FILE=$IOD_HOME/output/$MY_MPI_HOST.fs_test.db"
+export FS_TEST_EXTRA="$IOD_HOME/scripts/iod_fs_test_extra.sh"

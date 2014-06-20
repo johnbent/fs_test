@@ -259,7 +259,7 @@ main( int argc, char *argv[] )
 #endif
 
 #ifdef HAS_IOD
-    if (params.io_type == IO_IOD && params.plfs_flatten) {
+    if  (params.io_type == IO_IOD && params.plfs_flatten && !params.read_only_flag) {
             double begin_time = MPI_Wtime();
             iod_persist(&(state.iod_state));
             read_times.plfs_flatten_time = MPI_Wtime()-begin_time;
@@ -1050,7 +1050,8 @@ init( int argc, char **argv, struct Parameters *params,
 		#ifdef HAS_IOD
 		int ret = iod_init(params, state, MPI_COMM_WORLD);
 		if (ret != 0) {
-			printf("iod_initialize failed rc: %d, exit.\n", ret);
+			printf("iod_init failed rc: %s (%d), exit.\n", 
+                            strerror(-ret), ret);
 			assert(0);
 		}
 		#else
@@ -1303,7 +1304,9 @@ open_file(  struct Parameters *params,
 		mpi_ret = iod_open( params, state, target, read_write, comm_file );
 		MPI_Barrier(comm_file);
 		if ( mpi_ret != 0 ) {
-			printf( "Don't know how to do IOD open yet.\n");
+                        char hostname[1024];
+                        gethostname(hostname,1024);
+			printf( "Error on %s in IOD open.\n", hostname);
 			assert(0);
 		} else {
 			success = 1;

@@ -11,11 +11,12 @@ $target = $ARGV[0];
 
 %targets = (
     code    => "$CODE",
+    demo    => "$CODE/iod/test/iod_tst/M8_Demo",
     dior    => "/home/jlombard/ior/src",
     expr    => "$CODE/fs_test/experiment_management",
     fs      => "$CODE/fs_test/fs_test",
     iod     => "$IOD",
-    ior     => "$IOD/ior/src",
+    ior     => "$CODE/ior/",
     plfs    => "$CODE/iod/src/dep/plfs/",
     scripts => "$IOD/scripts",
     tests   => "$IOD/tests/",
