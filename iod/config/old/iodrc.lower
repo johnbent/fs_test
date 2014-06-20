@@ -1,5 +1,1 @@
-iod_root                 /tmp/iod_root
-iod_threadpool_size      8
-mount_point              /tmp/iod_plfs
-central_path             /mnt/daos
-iod_shards_per_target	4
+iodrc

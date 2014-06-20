@@ -2,7 +2,7 @@
 
 source /scratch/iod/tests/funcs.sh
 
-checkroot
+#checkroot
 
 function Usage () {
 	echo "Usage: $0 <container_path>"
@@ -31,13 +31,18 @@ du -h $cpath
 
 command="daos_ctl run -c $cpath Cor,Cq,Eq,Cc"
 
+# get nshards
+Parse "$command" "# shards:" 3 nshards
+echo "$nshards shards"
+
 # get HCE
 Parse "$command" "HCE" 2 hce
 echo "HCE is $hce"
 
-# get nshards
-Parse "$command" "# shards:" 3 nshards
-echo "$nshards shards"
+if [ "$hce" -le "0" ] 
+then
+    exit
+fi
 
 # query each shard
 for (( i=0; i < $nshards; i++))
@@ -45,9 +50,10 @@ do
 	command="daos_ctl run -c $cpath Cor,Sq$hce:$i,Sl$hce:$i,Cc"
 	Parse "$command" "Object numbers" 3 nobj
 	Parse "$command" "Object numbers" 6 sz
+        Parse "$command" "Target ID" 3 targ
 	mbs=$(($sz/1048576))
 	objlist=`$command | grep "\[$i:"`
-	echo "Shard $i has $nobj objects and uses $sz ($mbs MB)"
+	echo "Shard $i on daos target $targ has $nobj objects and uses $sz ($mbs MB)"
 	echo "Objects in shard $i: $objlist"
 	#echo $command
 	#nobj=`$command | grep 

@@ -1,3 +1,4 @@
+# On 22.05.14, we changed the environment again
 # As of M8, we reset up the environment:
 # [4/8/14, 2:06:29 PM] Johann Lombardi: 
 # lola-[12-19] are IONs
@@ -67,20 +68,23 @@ export EFF_CLUSTER="none"
 for n in  $EFF_ION_LOWER $EFF_CN_LOWER
 do
 	if Hostname_match $n ; then
-		Set_cluster "$EFF_ION_LOWER" "$EFF_CN_LOWER" "lower"
+		#Set_cluster "$EFF_ION_LOWER" "$EFF_CN_LOWER" "lower"
+                Set_cluster "$EFF_ION_ALL" "$EFF_CN_ALL" "all"
 	fi
 done
 
 for n in  $EFF_ION_UPPER $EFF_CN_UPPER
 do
 	if Hostname_match $n ; then
-		Set_cluster "$EFF_ION_UPPER" "$EFF_CN_UPPER" "upper"
+		#Set_cluster "$EFF_ION_UPPER" "$EFF_CN_UPPER" "upper"
+                Set_cluster "$EFF_ION_ALL" "$EFF_CN_ALL" "all"
 	fi
 done
 
 for n in $EFF_DAOS_UPPER
 do
 	if Hostname_match $n ; then
-		Set_cluster "$EFF_DAOS_UPPER" "$EFF_CN_UPPER" "upper"
+		#Set_cluster "$EFF_DAOS_UPPER" "$EFF_CN_UPPER" "upper"
+                Set_cluster "$EFF_DAOS_UPPER" "$EFF_DAOS_UPPER" "all"
 	fi
 done

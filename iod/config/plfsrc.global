@@ -1,11 +1,13 @@
 - global_params:
   num_hostdirs: 16
-  max_index_length: 2097152
+  max_index_length: 1048576
   threadpool_size: 8
   index_buffer_mbs: 16
 #  global_summary_dir: /tmp
   mlog_setmasks:
-     DEBUG
+     DEBUG,index=ERR,container=ERR,internal=ERR,plfs_misc=ERR,POSIXIO=ERR,fileops=ERR,utilities=ERR,writefile=ERR
+    #ERR
+#     DEBUG
 #    INFO
 #    index=DEBUG
 #    container=DEBUG

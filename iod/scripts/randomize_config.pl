@@ -35,6 +35,7 @@ readfile {
 sub
 modify {
     my ($k, $v) = @_;
+    my $modified = 0; 
     foreach my $key ( keys %keys ) {
         if ( $k eq $key ) {
             #print "MATCH: match on $k\n";
@@ -42,6 +43,7 @@ modify {
             my $which_val = rand(scalar @vals);
             $v = $vals[$which_val];
             #print "REPLACE $key with $v\n";
+            $modified = 1;
         }
     }
     return ($k, $v);
