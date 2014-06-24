@@ -1,0 +1,36 @@
+diff --git a/src/IOStore/Glib/GlibIOStore.cpp b/src/IOStore/Glib/GlibIOStore.cpp
+index 0336851..919b602 100644
+--- a/src/IOStore/Glib/GlibIOStore.cpp
++++ b/src/IOStore/Glib/GlibIOStore.cpp
+@@ -201,6 +201,19 @@ GlibIOSHandle::Size(off_t *ret_offset) {
+ };
+ 
+ plfs_error_t
++GlibIOSHandle::Writev(struct iovec *iov, int iovcnt, ssize_t *bytes_written) {
++  ssize_t rv = 0;
++  int i;
++  for ( i = 0; i < iovcnt; i++ ) {
++    ssize_t bytes;
++    rv = Write(iov[i].iov_base, iov[i].iov_len, &bytes); 
++    if (rv < 0) return (get_err(rv));
++    bytes_written += bytes;
++  } 
++  return(get_err(rv));
++}
++
++plfs_error_t
+ GlibIOSHandle::Write(const void* buf, size_t len, ssize_t *bytes_written) {
+     ssize_t rv;
+     rv = fwrite(buf,1,len,this->fp);
+diff --git a/src/IOStore/Glib/GlibIOStore.h b/src/IOStore/Glib/GlibIOStore.h
+index 3e60a94..5be0905 100644
+--- a/src/IOStore/Glib/GlibIOStore.h
++++ b/src/IOStore/Glib/GlibIOStore.h
+@@ -28,6 +28,7 @@ class GlibIOSHandle: public IOSHandle {
+     plfs_error_t ReleaseDataBuf(void *buf, size_t length);
+     plfs_error_t Size(off_t *ret_offset);
+     plfs_error_t Write(const void* buf, size_t len, ssize_t *bytes_written);
++    plfs_error_t Writev(struct iovec *iov, int iovcnt, ssize_t *bytes_written);
+     
+  private:
+     plfs_error_t Close();
