@@ -2379,6 +2379,9 @@ read_write_file( struct Parameters *params,
     memset( buffer, 0, params->obj_size );
     test_set_buf( buffer, params->obj_size, state, i, state->pagesize, 
             params->touch, params->check_data_ndx, INIT_MODE, 0, NULL );
+    /* test_set_buf can be slow for large objects and high touch/check
+     * so barrier so that the time taken here doesn't show up in open */
+    barrier( state, NULL ); 
 
         // start the clock and open the file
     begin_time = MPI_Wtime();
