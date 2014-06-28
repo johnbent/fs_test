@@ -64,6 +64,7 @@ int
 iod_set_otype( iod_state_t *s, const char *type ) {
     if (type == NULL) {
         s->otype = IOD_OBJ_BLOB; 
+        type = "blob";
     } else if (strcmp(type,"blob")==0) {
         s->otype = IOD_OBJ_BLOB;
     } else if (strcmp(type,"kv")==0) {
