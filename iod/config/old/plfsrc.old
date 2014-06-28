@@ -1,0 +1,24 @@
+- global_params:
+  num_hostdirs: 16
+  threadpool_size: 8
+  index_buffer_mbs: 16
+  #global_summary_dir: /tmp
+  mlog_setmasks:
+     DEBUG
+#    INFO
+#    index=DEBUG
+#    container=DEBUG
+#  mlog_file:  /tmp/plfs-%p-%h-%t.log
+  mlog_file:  /tmp/iod.debug.log
+#  mlog_file:  /dev/stdout
+- mount_point: /tmp/iod_plfs
+#  workload: shared_file
+  workload: n-1
+#  statfs: posix:///global/visible
+  backends:
+    - location: posix:/mnt/lustre1/iod/aBBa1/.plfs__canonical
+      type: canonical
+    - location: posix:/mnt/lustre1/iod/aBBa2/.plfs__shadow
+      type: shadow
+    - location: posix:/mnt/lustre1/iod/aBBa1/.plfs__shadow
+      type: shadow
