@@ -141,6 +141,8 @@ struct myoption mylongopts[] = {
         "General help or help about a specific argument"                    },
     { "io",         required_argument,  NULL,                           'i',
         "Whether to use POSIX, MPI, or PLFS IO routines (mpi|posix|plfs)"   },
+    { "iodkey",     required_argument,  NULL,                           'k',
+        "Whether to use hex or decimal for iod keys"                        },
     { "time",       required_argument,  NULL,                           'l',
         "Whether to only run for a set time limit (in seconds)"             },
     { "op",         required_argument,  NULL,                           'o',
@@ -426,6 +428,9 @@ int parse_command_line(int my_rank, int argc, char *argv[],
             params->iod_checksum = atoi(optarg);
             state->iod_state.params.checksum = params->iod_checksum;
 	    break;
+        case 'k':
+            params->iod_key = strdup(optarg);
+            break; 
 #endif
         case 'd':   
             temp_int = atoi( optarg );

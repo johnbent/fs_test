@@ -1978,6 +1978,8 @@ db_insert(  int my_rank,
                 "io_type"     );
             addDBStr( QUERY_SIZE, columns, values, mixed, params->iod_type,
                 "iod_type"     );
+            addDBStr( QUERY_SIZE, columns, values, mixed, params->iod_key,
+                "iod_key"     );
             addDBStr( QUERY_SIZE, columns, values, mixed, mpihome,              
                 "mpihome" );
             addDBStr( QUERY_SIZE, columns, values, mixed, segment,              

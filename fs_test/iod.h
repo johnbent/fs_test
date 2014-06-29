@@ -24,7 +24,7 @@ int iod_sync(iod_state_t *);
 int iod_trunc(iod_state_t * );
 int iod_unlink(iod_state_t *);
 int iod_write(iod_state_t *,char *buf, size_t len,off_t, ssize_t *bytes);
-int iod_set_otype(iod_state_t *,const char *);
+int iod_set_otype(iod_state_t *,struct Parameters *p);
 #endif
 
 

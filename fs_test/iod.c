@@ -61,19 +61,35 @@ iod_close( iod_state_t *s) {
 }
 
 int
-iod_set_otype( iod_state_t *s, const char *type ) {
-    if (type == NULL) {
+iod_set_keytype( iod_state_t *s, struct Parameters *p) { 
+    if (p->iod_key == NULL) {
+        p->iod_key = strdup("hex");
+    }
+    if (strcmp(p->iod_key,"hex")==0) {
+        s->keytype = "hex";
+    } else{
+        assert(strcmp(p->iod_key,"decimal")==0);
+        s->keytype = "decimal";
+    }
+    IDEBUG(s->myrank, "OBJ Key Type is %s", s->keytype);
+}
+
+int
+iod_set_otype(iod_state_t *s, struct Parameters *p) { 
+    if (p->iod_type == NULL) {
         s->otype = IOD_OBJ_BLOB; 
-        type = "blob";
-    } else if (strcmp(type,"blob")==0) {
+        p->iod_type = strdup("blob");
+    }
+    if (strcmp(p->iod_type,"blob")==0) {
         s->otype = IOD_OBJ_BLOB;
-    } else if (strcmp(type,"kv")==0) {
+    } else if (strcmp(p->iod_type,"kv")==0) {
         s->otype = IOD_OBJ_KV;
+        iod_set_keytype(s,p);
     } else {
-        assert(strcmp(type,"array")==0);
+        assert(strcmp(p->iod_type,"array")==0);
         s->otype = IOD_OBJ_ARRAY;
     }
-    IDEBUG(s->myrank, "OBJ Type is %s", type);
+    IDEBUG(s->myrank, "OBJ Type is %s", p->iod_type);
 }
 
 int
@@ -199,7 +215,7 @@ iod_init( struct Parameters *p, struct State *s, MPI_Comm comm ) {
 	}
 
         // set the oid now here as well so it's availabe in -op read mode
-        iod_set_otype(I,p->iod_type);
+        iod_set_otype(I,p);
         srand(time(NULL));
 	//I->oid = rand()%1024; // make a random one to make sure that striping works
         I->oid = 0;     // set to rank for N-N . . . 
@@ -435,8 +451,14 @@ setup_blob_io(size_t len, off_t off, char *buf, iod_state_t *s) {
 
 void
 setup_kv_io(size_t len, off_t *off, char *buf, iod_state_t *s) {
-    s->kv.key = (void *)off;
-    s->kv.key_len = (iod_size_t)sizeof(*off);
+    if (strcmp(s->keytype,"hex")==0) {
+        snprintf(s->hexkey,sizeof(s->hexkey),"%lX",(unsigned long)off);
+        s->kv.key = s->hexkey; 
+        s->kv.key_len = (iod_size_t)sizeof(s->hexkey);
+    } else {
+        s->kv.key = (void *)off;
+        s->kv.key_len = (iod_size_t)sizeof(*off);
+    }
     s->kv.value = (void*)buf;
     s->kv.value_len = (iod_size_t)len;
 }

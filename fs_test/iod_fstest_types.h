@@ -23,6 +23,8 @@ typedef struct iod_state_s {
         iod_hyperslab_t *slab;
 	iod_mem_desc_t *mem_desc;
 	iod_checksum_t *cksum;
+        char *keytype;
+        char hexkey[16]; // 16 chars is enough to hold 2^64 as hex
 	MPI_Comm mcom;
 	int myrank;
 } iod_state_t;
