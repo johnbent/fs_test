@@ -247,29 +247,28 @@ main( int argc, char *argv[] )
     // write the file
     if ( !params.read_only_flag ) {
         read_write_file( &params, &write_times, &state, WRITE_MODE );
+
+        #ifdef HAS_PLFS
+            // flatten and/or sleep as directed  (flatten is a weird plfs thing)
+            if (params.io_type == IO_PLFS && params.plfs_flatten) 
+                        flatten_file(&params,&state,&write_times);
+        #endif
+
+        #ifdef HAS_IOD
+            if  (params.io_type == IO_IOD && params.plfs_flatten && !params.read_only_flag) {
+                    double begin_time = MPI_Wtime();
+                    iod_persist(&(state.iod_state));
+                    write_times.plfs_flatten_time = MPI_Wtime()-begin_time;
+                    if (state.my_rank==0) {
+                        printf("IOD Persist Time: %.2f\n",write_times.plfs_flatten_time);
+                    }
+            }
+        #endif
         if ( params.use_db ) {
-            db_insert(state.my_rank, 0, NULL,&params,&state,&write_times,NULL,
-                    NULL);
-	    //printf("DEBUG %f\n", write_times.total_op_elapsed_time);
+            db_insert(state.my_rank, 0, NULL,&params,&state,&write_times,NULL, NULL);
+            //printf("DEBUG %f\n", write_times.total_op_elapsed_time);
         }
     }
-
-#ifdef HAS_PLFS
-    // flatten and/or sleep as directed  (flatten is a weird plfs thing)
-    if (params.io_type == IO_PLFS && params.plfs_flatten) 
-		flatten_file(&params,&state,&read_times);
-#endif
-
-#ifdef HAS_IOD
-    if  (params.io_type == IO_IOD && params.plfs_flatten && !params.read_only_flag) {
-            double begin_time = MPI_Wtime();
-            iod_persist(&(state.iod_state));
-            read_times.plfs_flatten_time = MPI_Wtime()-begin_time;
-            if (state.my_rank==0) {
-                printf("IOD Persist Time: %.2f\n",read_times.plfs_flatten_time);
-            }
-    }
-#endif
 
     if (params.sleep_seconds) sleep(params.sleep_seconds); 
 

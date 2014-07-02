@@ -62,6 +62,12 @@ iod_close( iod_state_t *s) {
 
 int
 iod_set_keytype( iod_state_t *s, struct Parameters *p) { 
+    /* clear the keytype if not KV. This makes DB results easier */
+    if ( s->otype != IOD_OBJ_KV ) {
+        if (p->iod_key) free(p->iod_key);
+        p->iod_key = NULL;
+        return 0;
+    }
     if (p->iod_key == NULL) {
         p->iod_key = strdup("hex");
     }
@@ -84,11 +90,11 @@ iod_set_otype(iod_state_t *s, struct Parameters *p) {
         s->otype = IOD_OBJ_BLOB;
     } else if (strcmp(p->iod_type,"kv")==0) {
         s->otype = IOD_OBJ_KV;
-        iod_set_keytype(s,p);
     } else {
         assert(strcmp(p->iod_type,"array")==0);
         s->otype = IOD_OBJ_ARRAY;
     }
+    iod_set_keytype(s,p);
     IDEBUG(s->myrank, "OBJ Type is %s", p->iod_type);
 }
 
